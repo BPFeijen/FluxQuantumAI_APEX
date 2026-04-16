@@ -34,6 +34,7 @@ import logging
 import sys
 import threading
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -44,6 +45,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from mt5_executor import MT5Executor, MAGIC, SYMBOL, LOT_SIZE, MIN_LOT, _split_lots
 from live.hedge_manager import HedgeManager
+from live.level_detector import derive_m30_bias
 
 # V3 RL -- lazy import so the module loads even without sb3-contrib installed
 try:
@@ -57,6 +59,9 @@ except ImportError:
 MICRO_DIR       = Path("C:/data/level2/_gc_xcec")
 TRADES_CSV      = Path("C:/FluxQuantumAI/logs/trades.csv")
 DECISIONS_LOG   = Path("C:/FluxQuantumAI/logs/position_decisions.log")
+POSITION_EVENTS_LOG = Path("C:/FluxQuantumAI/logs/position_events.jsonl")
+DECISION_LIVE_PATH = Path("C:/FluxQuantumAI/logs/decision_live.json")
+DECISION_LOG_PATH  = Path("C:/FluxQuantumAI/logs/decision_log.jsonl")
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -197,25 +202,8 @@ def _derive_m30_bias(df: pd.DataFrame) -> str:
     Bearish: liq_bot extended BELOW box_low   -> DN breakout confirmed
     Unknown: box not confirmed or levels not available
     """
-    import math
-    try:
-        confirmed = df[df["m30_box_confirmed"] == True]
-        row       = confirmed.iloc[-1] if not confirmed.empty else df.iloc[-1]
-
-        box_high = float(row.get("m30_box_high", float("nan")))
-        box_low  = float(row.get("m30_box_low",  float("nan")))
-        liq_top  = float(row.get("m30_liq_top",  float("nan")))
-        liq_bot  = float(row.get("m30_liq_bot",  float("nan")))
-
-        if math.isnan(liq_top) or math.isnan(box_high):
-            return "unknown"
-        if liq_top > box_high:
-            return "bullish"
-        if not math.isnan(liq_bot) and not math.isnan(box_low) and liq_bot < box_low:
-            return "bearish"
-    except Exception:
-        pass
-    return "unknown"
+    bias, _is_confirmed = derive_m30_bias(df, confirmed_only=False)
+    return bias
 
 
 def _get_m30_snapshot_from_parquet() -> dict:
@@ -422,6 +410,8 @@ class PositionMonitor:
         # Decision log file handle (append mode, opened once)
         DECISIONS_LOG.parent.mkdir(parents=True, exist_ok=True)
         self._dec_log_fh = open(DECISIONS_LOG, "a", encoding="utf-8", buffering=1)
+        POSITION_EVENTS_LOG.parent.mkdir(parents=True, exist_ok=True)
+        self._canonical_lock = threading.Lock()
 
         # Hedge manager -- pullback hedge lifecycle (post-SHIELD only)
         self._hedge_mgr = HedgeManager(executor, dry_run=dry_run)
@@ -871,6 +861,14 @@ class PositionMonitor:
             print(f"[{ts}]   SHIELD OK -- modified tickets: {result['modified']}")
         else:
             print(f"[{ts}]   SHIELD PARTIAL -- errors: {result['errors']}")
+        self._emit_position_event(
+            event_type="SHIELD",
+            direction=direction,
+            ticket=pos.get("ticket"),
+            reason="leg1 closed / move SL to breakeven",
+            action_taken="MOVE_SL_TO_ENTRY",
+            result="OK" if result.get("success") else "PARTIAL",
+        )
         state["shield_done"] = True
 
     # ------------------------------------------------------------------
@@ -1428,6 +1426,16 @@ class PositionMonitor:
                     self._close_ticket(pos["ticket"], "T3_DEFENSE_EXIT", ts)
 
                 self._t3_last_exit_mono = now_mono
+                self._emit_position_event(
+                    event_type="T3_EXIT",
+                    direction=direction,
+                    ticket=pos.get("ticket"),
+                    reason=log_msg,
+                    action_taken="CLOSE",
+                    result="LIVE_CLOSE_TRIGGERED",
+                    attempted=True,
+                    execution_state="ATTEMPTED",
+                )
 
                 try:
                     from live import telegram_notifier as tg
@@ -1446,6 +1454,16 @@ class PositionMonitor:
                 would_action = f"EXIT_{direction}"
                 log.warning("[T3_SHADOW] would_exit=YES %s | action=%s", log_msg, would_action)
                 print(f"[{ts}] [T3_SHADOW] would_exit=YES | {would_action} | {log_msg}")
+                self._emit_position_event(
+                    event_type="T3_EXIT",
+                    direction=direction,
+                    ticket=pos.get("ticket"),
+                    reason=log_msg,
+                    action_taken="OBSERVE",
+                    result="SHADOW_ONLY",
+                    attempted=False,
+                    execution_state="NOT_ATTEMPTED",
+                )
 
         except Exception as e:
             log.debug("T3 check error: %s", e)
@@ -1508,14 +1526,45 @@ class PositionMonitor:
 
         if self.dry_run:
             print(f"[{ts}]   [DRY RUN] WOULD update SL to {trail_sl:.2f}")
+            self._emit_position_event(
+                event_type="TRAILING_STOP_UPDATE",
+                direction=direction,
+                ticket=ticket,
+                reason=f"trail_sl {current_sl:.2f}->{trail_sl:.2f}",
+                action_taken="MODIFY_SL",
+                result="DRY_RUN",
+                attempted=False,
+                execution_state="NOT_ATTEMPTED",
+            )
             return
 
         ok, msg = self.executor._modify_sl(ticket, trail_sl)
         if ok:
             print(f"[{ts}]   TRAIL SL updated: {trail_sl:.2f}")
+            self._emit_position_event(
+                event_type="TRAILING_STOP_UPDATE",
+                direction=direction,
+                ticket=ticket,
+                reason=f"trail_sl {current_sl:.2f}->{trail_sl:.2f}",
+                action_taken="MODIFY_SL",
+                result="SUCCESS",
+                attempted=True,
+                execution_state="EXECUTED",
+            )
         else:
             print(f"[{ts}]   TRAIL SL failed: {msg}")
             log.warning("trailing SL failed ticket=%d: %s", ticket, msg)
+            self._emit_position_event(
+                event_type="TRAILING_STOP_UPDATE",
+                direction=direction,
+                ticket=ticket,
+                reason=f"trail_sl {current_sl:.2f}->{trail_sl:.2f}",
+                action_taken="MODIFY_SL",
+                result="FAILED",
+                attempted=True,
+                execution_state="FAILED",
+                execution_error=str(msg),
+            )
 
     # ------------------------------------------------------------------
     # CHECK 7 -- Pullback End Exit (Group A + Group B design)
@@ -1876,18 +1925,169 @@ class PositionMonitor:
     # Shared close helper
     # ------------------------------------------------------------------
 
+    def _emit_position_event(
+        self,
+        event_type: str,
+        direction: str,
+        ticket: int | None,
+        reason: str,
+        action_taken: str,
+        result: str,
+        group: str | None = None,
+        execution_state: str = "NOT_ATTEMPTED",
+        execution_error: str = "",
+        attempted: bool = False,
+        broker: str = "UNKNOWN",
+        account: str | int | None = None,
+    ) -> None:
+        _etype_map = {
+            "T3_DEFENSE_EXIT": "T3_EXIT",
+            "PULLBACK_END": "PULLBACK_END_EXIT",
+        }
+        event_type = _etype_map.get(event_type, event_type)
+        payload = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "event_source": "POSITION_MONITOR",
+            "event_type": event_type,
+            "action_type": action_taken,
+            "direction_affected": direction,
+            "dry_run": bool(self.dry_run),
+            "t3_mode": getattr(self, "_t3_mode", "UNKNOWN"),
+            "execution_state": execution_state,
+            "execution_error": execution_error,
+            "attempted": attempted,
+            "broker": broker,
+            "account": account,
+            "reason": reason,
+            "ticket": int(ticket) if ticket is not None else None,
+            "group": group,
+            "result": result,
+        }
+        try:
+            with open(POSITION_EVENTS_LOG, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(payload, default=str) + "\n")
+        except Exception as e:
+            log.debug("position event log write failed: %s", e)
+        self._publish_canonical_pm_event(payload)
+
+    def _publish_canonical_pm_event(self, event_payload: dict) -> None:
+        """Publish PositionMonitor event into canonical decision outputs."""
+        now_iso = datetime.now(timezone.utc).isoformat()
+        decision_payload = {
+            "timestamp": now_iso,
+            "event_source": "POSITION_MONITOR",
+            "position_event": dict(event_payload),
+            "decision": {
+                "action": "PM_EVENT",
+                "direction": event_payload.get("direction_affected", "UNKNOWN"),
+                "action_side": (
+                    "BUY" if event_payload.get("direction_affected") == "LONG"
+                    else "SELL" if event_payload.get("direction_affected") == "SHORT"
+                    else "UNKNOWN"
+                ),
+                "trade_intent": (
+                    "EXIT_LONG" if event_payload.get("direction_affected") == "LONG"
+                    else "EXIT_SHORT" if event_payload.get("direction_affected") == "SHORT"
+                    else "EXIT_ALL" if event_payload.get("direction_affected") == "BOTH"
+                    else "UNKNOWN"
+                ),
+                "message_semantics_version": "v1_canonical",
+                "reason": event_payload.get("reason", ""),
+                "execution": {
+                    "overall_state": event_payload.get("execution_state", "UNKNOWN_ERROR"),
+                    "attempted": bool(event_payload.get("attempted", False)),
+                    "brokers": [
+                        {
+                            "broker": event_payload.get("broker", "UNKNOWN"),
+                            "account": event_payload.get("account"),
+                            "attempted": bool(event_payload.get("attempted", False)),
+                            "result_state": event_payload.get("execution_state", "UNKNOWN_ERROR"),
+                            "ticket": event_payload.get("ticket"),
+                            "error_text": event_payload.get("execution_error", ""),
+                        }
+                    ],
+                    "updated_at": now_iso,
+                },
+            },
+            "created_at": now_iso,
+            "decision_id": str(uuid.uuid4())[:8],
+        }
+        try:
+            DECISION_LIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with self._canonical_lock:
+                tmp = DECISION_LIVE_PATH.with_suffix(".tmp")
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(decision_payload, f, indent=2, default=str)
+                tmp.replace(DECISION_LIVE_PATH)
+                with open(DECISION_LOG_PATH, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(decision_payload, default=str) + "\n")
+        except Exception as e:
+            log.debug("canonical PM publish failed: %s", e)
+
     def _close_ticket(self, ticket: int, reason: str, ts: str) -> None:
+        _dir = "UNKNOWN"
+        try:
+            for _p in self.executor.get_open_positions() or []:
+                if int(_p.get("ticket", 0)) == int(ticket):
+                    _dir = str(_p.get("direction", "UNKNOWN")).upper()
+                    break
+        except Exception:
+            _dir = "UNKNOWN"
+        _broker = "Hantec" if bool(getattr(self.executor, "is_live", False)) else "RoboForex"
+        _account = None
+        if hasattr(self.executor, "get_account_info"):
+            try:
+                _account = self.executor.get_account_info().get("login")
+            except Exception:
+                _account = None
         if self.dry_run:
             print(f"[{ts}]   [DRY RUN] WOULD CLOSE ticket={ticket} ({reason})")
+            self._emit_position_event(
+                event_type=reason,
+                direction=_dir,
+                ticket=ticket,
+                reason=reason,
+                action_taken="CLOSE",
+                result="DRY_RUN",
+                attempted=False,
+                execution_state="NOT_ATTEMPTED",
+                broker=_broker,
+                account=_account,
+            )
             return
         result = self.executor.close_position(ticket)
         if result["success"]:
             print(f"[{ts}]   CLOSED ticket={ticket}  pnl={result['pnl']:+.2f}  ({reason})")
             log.info("CLOSED ticket=%d pnl=%.2f reason=%s", ticket, result["pnl"], reason)
+            self._emit_position_event(
+                event_type=reason,
+                direction=_dir,
+                ticket=ticket,
+                reason=reason,
+                action_taken="CLOSE",
+                result="SUCCESS",
+                attempted=True,
+                execution_state="EXECUTED",
+                broker=_broker,
+                account=_account,
+            )
         else:
             print(f"[{ts}]   CLOSE FAILED ticket={ticket}: {result.get('error')}  ({reason})")
             log.error("close_position ticket=%d failed: %s  reason=%s",
                       ticket, result.get("error"), reason)
+            self._emit_position_event(
+                event_type=reason,
+                direction=_dir,
+                ticket=ticket,
+                reason=reason,
+                action_taken="CLOSE",
+                result=f"FAILED:{result.get('error')}",
+                attempted=True,
+                execution_state="FAILED",
+                execution_error=str(result.get("error", "")),
+                broker=_broker,
+                account=_account,
+            )
 
 
 def _ts() -> str:

@@ -86,6 +86,9 @@ def notify_decision() -> bool:
     _last_decision_id = dec_id
 
     direction = dec.get("direction", "?")
+    action_side = dec.get("action_side") or ("BUY" if direction == "LONG" else "SELL")
+    trade_intent = dec.get("trade_intent", f"ENTRY_{direction}")
+    semantics_v = dec.get("message_semantics_version", "v1_canonical")
     price_mt5 = dl.get("price_mt5", 0)
     price_gc = dl.get("price_gc", 0)
     score = dec.get("total_score", 0)
@@ -97,12 +100,15 @@ def notify_decision() -> bool:
     _trigger_dict = dl.get("trigger", {})
     _nl_source = _trigger_dict.get("near_level_source", "?")
 
-    # Context from service_state
+    # Context comes from canonical decision payload first; fallback to service_state
+    ctx = dl.get("context", {})
     ss = _read_json(_SERVICE_STATE_PATH) or {}
-    phase = ss.get("phase", "?")
-    bias = ss.get("m30_bias", "?")
-    d4h = ss.get("delta_4h", 0)
-    atr = ss.get("atr_m30", 0)
+    phase = ctx.get("phase", ss.get("phase", "?"))
+    bias = ctx.get("m30_bias", ss.get("m30_bias", "?"))
+    d4h = ctx.get("delta_4h", ss.get("delta_4h", 0))
+    atr = ctx.get("m30_atr14", ss.get("atr_m30", 0))
+    anomaly = dl.get("anomaly", {})
+    iceberg = dl.get("iceberg", {})
 
     # Gates
     gates = dl.get("gates", {})
@@ -124,6 +130,7 @@ def notify_decision() -> bool:
 
         text = (
             f"\U0001F680 <b>ENTRY \u2014 {direction}</b>\n"
+            f"Intent: {trade_intent} | Side: {action_side}\n"
             f"Price: {price_mt5:.2f}\n"
             f"SL: {sl:.2f} ({sl_dist:.1f} pts)\n"
             f"TP1: {tp1:.2f} ({tp1_dist:.1f} pts) | TP2: {tp2:.2f}\n"
@@ -139,9 +146,11 @@ def notify_decision() -> bool:
             f"Context:\n"
             f"Phase: {phase} | Bias: {bias}\n"
             f"\u03944h: {d4h:+.0f} | ATR: {atr:.1f}\n"
+            f"Anomaly: {anomaly.get('alignment', 'UNKNOWN')}/{anomaly.get('severity', 'NONE')} | Pos: {anomaly.get('position_action', 'UNKNOWN')}\n"
+            f"Iceberg: {iceberg.get('alignment', 'UNKNOWN')}/{iceberg.get('severity', 'NONE')} | Pos: {iceberg.get('position_action', 'UNKNOWN')}\n"
             f"Gates:\n"
             f"{gates_line}\n"
-            f"\U0001F194 {dec_id} | {ts_display}"
+            f"\U0001F194 {dec_id} | {ts_display} | {semantics_v}"
         )
 
     elif action in ("BLOCK", "GO"):
@@ -155,6 +164,7 @@ def notify_decision() -> bool:
 
         text = (
             f"\u26D4 <b>BLOCK \u2014 {direction}</b>\n"
+            f"Intent: {trade_intent} | Setup blocked: {action_side}\n"
             f"Price: {price_mt5:.2f}\n"
             f"Source: {_nl_source}\n"
         )
@@ -165,11 +175,24 @@ def notify_decision() -> bool:
             f"Context:\n"
             f"Phase: {phase} | Bias: {bias}\n"
             f"\u03944h: {d4h:+.0f}\n"
+            f"Anomaly: {anomaly.get('alignment', 'UNKNOWN')}/{anomaly.get('severity', 'NONE')} | Entry: {anomaly.get('entry_action', 'UNKNOWN')} | Pos: {anomaly.get('position_action', 'UNKNOWN')}\n"
+            f"Iceberg: {iceberg.get('alignment', 'UNKNOWN')}/{iceberg.get('severity', 'NONE')} | Entry: {iceberg.get('entry_action', 'UNKNOWN')} | Pos: {iceberg.get('position_action', 'UNKNOWN')}\n"
             f"Gates:\n"
             f"{gates_line}\n"
-            f"\U0001F194 {dec_id} | {ts_display}"
+            f"\U0001F194 {dec_id} | {ts_display} | {semantics_v}"
         )
 
+    elif action == "PM_EVENT":
+        pe = dl.get("position_event", {})
+        text = (
+            f"\U0001F6E0 <b>POSITION EVENT — {pe.get('event_type', '?')}</b>\n"
+            f"Dir: {pe.get('direction_affected', 'UNKNOWN')} | Action: {pe.get('action_type', 'UNKNOWN')}\n"
+            f"Reason: {pe.get('reason', '')}\n"
+            f"Exec: {pe.get('execution_state', 'UNKNOWN')} | DryRun: {pe.get('dry_run')} | T3: {pe.get('t3_mode', 'UNKNOWN')}\n"
+            f"Broker: {pe.get('broker', 'UNKNOWN')} | Account: {pe.get('account', '?')} | Ticket: {pe.get('ticket', '?')}\n"
+            f"Result: {pe.get('result', '')}\n"
+            f"\U0001F194 {dec_id} | {ts_display} | {semantics_v}"
+        )
     else:
         # Unknown action — send generic
         text = (

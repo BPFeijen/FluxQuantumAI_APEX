@@ -67,6 +67,7 @@ from live.operational_rules import OperationalRules
 from live.tick_breakout_monitor import TickBreakoutMonitor
 from live.kill_zones import kill_zone_label
 from live.price_speed import PriceSpeedTracker
+from live.level_detector import derive_m30_bias
 from live import telegram_notifier as tg
 
 # Hantec live executor -- optional, graceful fallback
@@ -390,9 +391,14 @@ def _build_protection_advice(
     source: str,
     alignment: str = "UNKNOWN",
     severity: str = "NONE",
+    flow_relation: str = "UNKNOWN",
     entry_action: str = "UNKNOWN",
     position_action: str = "UNKNOWN",
     reason: str = "",
+    detected: bool = False,
+    side: str = "UNKNOWN",
+    confidence: float | None = None,
+    refills: int | None = None,
 ) -> dict:
     """
     Build a normalised protection advice dict.
@@ -401,11 +407,16 @@ def _build_protection_advice(
     position_action uses directional exits: EXIT_LONG / EXIT_SHORT / EXIT_ALL.
     """
     return {
+        "detected": detected,
+        "side": side,
         "alignment": alignment,
         "severity": severity,
+        "flow_relation": flow_relation,
         "entry_action": entry_action,
         "position_action": position_action,
         "reason": reason,
+        "confidence": confidence,
+        "refills": refills,
         "shadow_only": True,
         "source": source,
         "rule_based": True,
@@ -415,7 +426,9 @@ def _build_protection_advice(
 def _default_protection() -> dict:
     """Return the default protection block with both sources at UNKNOWN/default."""
     return {
-        "anomaly": _build_protection_advice("DEFENSE_MODE", entry_action="ALLOW", position_action="HOLD"),
+        "anomaly": _build_protection_advice(
+            "DEFENSE_MODE", entry_action="ALLOW", position_action="HOLD"
+        ),
         "iceberg": _build_protection_advice("ICEBERG"),
     }
 
@@ -470,6 +483,8 @@ class EventProcessor:
         # M30 bias: "bullish" | "bearish" | "unknown"  (set by _refresh_levels)
         # Used as hard gate: M5 signals contra-M30 are rejected before gate.check()
         self.m30_bias       = "unknown"
+        self.m30_bias_confirmed = False
+        self.provisional_m30_bias = "unknown"
         # M30 structural levels in GC space (for border alignment check)
         self.m30_liq_top_gc: float | None = None
         self.m30_liq_bot_gc: float | None = None
@@ -527,6 +542,8 @@ class EventProcessor:
         # after a CONFIRMED order (regardless of whether position is still open).
         # Prevents rapid re-entry after breakeven SL hit.
         self._direction_lock_until: dict[str, float] = {}   # direction -> monotonic epoch
+        self._macro_ctx_last_refresh: float = 0.0
+        self._macro_ctx_refresh_needed: bool = True
 
         # Sprint 8: Trade cooldown -- prevents rapid re-entry at same/any level
         self._last_trade_time: float = 0.0          # monotonic epoch of last confirmed trade
@@ -780,6 +797,8 @@ class EventProcessor:
             "liq_top_mt5": _safe_round(getattr(self, "liq_top", None)),
             "liq_bot_mt5": _safe_round(getattr(self, "liq_bot", None)),
             "m30_bias": getattr(self, "m30_bias", "unknown"),
+            "m30_bias_confirmed": getattr(self, "m30_bias_confirmed", False),
+            "provisional_m30_bias": getattr(self, "provisional_m30_bias", "unknown"),
             "daily_trend": getattr(self, "daily_trend", "unknown"),
             "delta_4h": _safe_round(self._metrics.get("delta_4h", 0), 0),
             "atr_m30": _safe_round(self._metrics.get("atr_m30_parquet", self._metrics.get("atr", 0))),
@@ -864,6 +883,30 @@ class EventProcessor:
         ice = decision.iceberg
         mom = decision.momentum
 
+        _action = "GO" if decision.go else "BLOCK"
+        _side = "BUY" if direction == "LONG" else "SELL"
+        _intent = f"ENTRY_{direction}"
+        _ice = {
+            "detected": bool(getattr(ice, "detected", False)),
+            "side": "BUY" if str(getattr(ice, "sweep_dir", "")).upper() in ("BUY", "BID", "LONG") else (
+                "SELL" if str(getattr(ice, "sweep_dir", "")).upper() in ("SELL", "ASK", "SHORT") else "UNKNOWN"
+            ),
+            "alignment": (
+                "ALIGNED" if bool(getattr(ice, "aligned", False))
+                else ("OPPOSED" if getattr(ice, "detected", False) else "UNKNOWN")
+            ),
+            "severity": (
+                "CRITICAL" if float(getattr(ice, "score", 0.0) or 0.0) >= 0.9
+                else "HIGH" if float(getattr(ice, "score", 0.0) or 0.0) >= 0.75
+                else "MEDIUM" if float(getattr(ice, "score", 0.0) or 0.0) >= 0.6
+                else "LOW" if getattr(ice, "detected", False) else "NONE"
+            ),
+            "confidence": round(float(getattr(ice, "score", 0.0) or 0.0), 4),
+            "refills": int(getattr(ice, "refills", 0) or 0),
+            "entry_action": self._cycle_protection.get("iceberg", {}).get("entry_action", "UNKNOWN"),
+            "position_action": self._cycle_protection.get("iceberg", {}).get("position_action", "UNKNOWN"),
+        }
+
         d = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "price_mt5": round(price, 2),
@@ -873,6 +916,8 @@ class EventProcessor:
                 "phase": self._get_current_phase(),
                 "daily_trend": self.daily_trend,
                 "m30_bias": self.m30_bias,
+                "m30_bias_confirmed": self.m30_bias_confirmed,
+                "provisional_m30_bias": self.provisional_m30_bias,
                 "m30_box_mt5": [round(self.box_low, 2), round(self.box_high, 2)] if self.box_high else None,
                 "m30_fmv_mt5": None,
                 "m30_atr14": round(atr_m30, 2),
@@ -904,14 +949,24 @@ class EventProcessor:
                                "aligned": ice.aligned if ice.detected else None},
             },
             "decision": {
-                "action": "GO" if decision.go else "BLOCK",
+                "action": _action,
                 "direction": direction,
+                "action_side": _side,
+                "trade_intent": _intent,
+                "message_semantics_version": "v1_canonical",
                 "reason": decision.reason,
                 "total_score": decision.total_score,
+                "execution": {
+                    "overall_state": "NOT_ATTEMPTED",
+                    "attempted": False,
+                    "brokers": [],
+                },
             },
             "expansion_lines_mt5": expansion_lines_mt5 or [],
             "micro_atr_proxy": round(self._metrics.get("atr", 0), 2),
             "protection": dict(self._cycle_protection),
+            "anomaly": dict(self._cycle_protection.get("anomaly", {})),
+            "iceberg": _ice,
         }
 
         # Add execution details for GO
@@ -922,6 +977,71 @@ class EventProcessor:
             d["decision"]["lots"] = lots or []
 
         return d
+
+    def _write_stale_block_decision(self, direction: str, price: float, reason: str, trigger: str) -> None:
+        """Write canonical decision snapshot when gate is blocked by stale structure."""
+        gc_mid = self._metrics.get("gc_mid", 0.0)
+        offset = self._gc_xauusd_offset
+        atr_m30 = self._metrics.get("atr_m30_parquet", self._metrics.get("atr", 0))
+        payload = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "price_mt5": round(price, 2),
+            "price_gc": round(gc_mid, 2),
+            "gc_mt5_offset": round(offset, 2),
+            "context": {
+                "phase": self._get_current_phase(),
+                "daily_trend": self.daily_trend,
+                "m30_bias": self.m30_bias,
+                "m30_bias_confirmed": self.m30_bias_confirmed,
+                "provisional_m30_bias": self.provisional_m30_bias,
+                "m30_box_mt5": [round(self.box_low, 2), round(self.box_high, 2)] if self.box_high else None,
+                "m30_fmv_mt5": None,
+                "m30_atr14": round(atr_m30, 2),
+                "liq_top_mt5": round(self.liq_top, 2),
+                "liq_bot_mt5": round(self.liq_bot, 2),
+                "liq_top_gc": round(self.liq_top_gc, 2),
+                "liq_bot_gc": round(self.liq_bot_gc, 2),
+                "delta_4h": round(self._metrics.get("delta_4h", 0), 0),
+                "structure_stale": True,
+                "structure_stale_reason": reason,
+            },
+            "trigger": {
+                "type": trigger,
+                "level_type": "liq_top" if direction == "SHORT" else "liq_bot",
+                "level_price_mt5": round(self.liq_top if direction == "SHORT" else self.liq_bot, 2),
+                "proximity_pts": round(abs(price - (self.liq_top if direction == "SHORT" else self.liq_bot)), 1),
+                "near_level_source": self._near_level_source or "unknown",
+            },
+            "decision": {
+                "action": "BLOCK",
+                "direction": direction,
+                "action_side": "BUY" if direction == "LONG" else "SELL",
+                "trade_intent": f"ENTRY_{direction}",
+                "message_semantics_version": "v1_canonical",
+                "reason": reason,
+                "total_score": None,
+                "execution": {
+                    "overall_state": "NOT_ATTEMPTED",
+                    "attempted": False,
+                    "brokers": [],
+                },
+            },
+            "expansion_lines_mt5": [],
+            "micro_atr_proxy": round(self._metrics.get("atr", 0), 2),
+            "protection": dict(self._cycle_protection),
+            "anomaly": dict(self._cycle_protection.get("anomaly", {})),
+            "iceberg": {
+                "detected": False,
+                "side": "UNKNOWN",
+                "alignment": "UNKNOWN",
+                "severity": "NONE",
+                "confidence": 0.0,
+                "refills": 0,
+                "entry_action": "UNKNOWN",
+                "position_action": "UNKNOWN",
+            },
+        }
+        self._write_decision(payload)
 
     # ------------------------------------------------------------------
     # Dual-account execution helper
@@ -937,25 +1057,66 @@ class EventProcessor:
         label: str = "",
         explicit_lots: Optional[list] = None,
         strategy_context: Optional[dict] = None,
-    ) -> bool:
+    ) -> dict:
         """
-        Open position on ALL connected accounts (demo + live) simultaneously.
-        Returns True if at least one account succeeded.
-        strategy_context: {entry_mode, daily_trend, phase, strategy_mode} for trade tracking.
+        Open position on ALL connected accounts and return canonical execution report.
         """
         ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
         success_any = False
+        attempted_any = False
         _lot_total = sum(explicit_lots) if explicit_lots else self.lot_size
         _ctx = strategy_context or {}
+        price = float(self._metrics.get("gc_mid", 0.0) - self._gc_xauusd_offset)
+        brokers: list[dict] = []
+
+        def _state_from_result(result: dict | None, connected: bool) -> tuple[str, str]:
+            if not connected:
+                return "BROKER_DISCONNECTED", "broker not connected"
+            if not result:
+                return "UNKNOWN_ERROR", "empty executor result"
+            if result.get("success"):
+                tickets = [int(t or 0) for t in result.get("tickets", [])]
+                opened = sum(1 for t in tickets if t > 0)
+                expected = 3 if int(result.get("legs", 3)) == 3 else 2
+                if opened >= expected:
+                    return "EXECUTED", ""
+                if opened > 0:
+                    return "PARTIAL", "some legs failed"
+                return "FAILED", str(result.get("error", "all legs failed"))
+            err = str(result.get("error", "unknown error"))
+            err_l = err.lower()
+            if "not connected" in err_l:
+                return "BROKER_DISCONNECTED", err
+            if "tick" in err_l:
+                return "IPC_TIMEOUT", err
+            if "symbol" in err_l:
+                return "SYMBOL_ERROR", err
+            if "reject" in err_l or "invalid" in err_l:
+                return "REJECTED", err
+            return "FAILED", err
 
         # -- Demo (RoboForex) --------------------------------------------
+        _demo = {
+            "broker": "RoboForex",
+            "account": None,
+            "attempted": False,
+            "result_state": "NOT_ATTEMPTED",
+            "ticket": None,
+            "error_code": None,
+            "error_text": "",
+        }
         if self.executor.connected:
+            attempted_any = True
+            _demo["attempted"] = True
             result = self.executor.open_position(
                 symbol=SYMBOL, direction=direction,
                 lot_size=_lot_total, sl=sl, tp1=tp1, tp2=tp2,
                 explicit_lots=explicit_lots,
             )
-            if result["success"]:
+            _demo["result_state"], _demo["error_text"] = _state_from_result(result, True)
+            _tickets = [int(t or 0) for t in result.get("tickets", [])]
+            _demo["ticket"] = next((t for t in _tickets if t > 0), None)
+            if result.get("success"):
                 t = result["tickets"]
                 prefix = f"[{label}] " if label else ""
                 print(f"[{ts}] {prefix}[DEMO] OPENED tickets={t}  entry={result['entry']:.2f}")
@@ -977,21 +1138,30 @@ class EventProcessor:
                 print(f"[{ts}] [DEMO] ORDER FAILED: {result.get('error')}")
         else:
             print(f"[{ts}] [DEMO] MT5 not connected -- skipping RoboForex")
+            _demo["result_state"] = "BROKER_DISCONNECTED"
+            _demo["error_text"] = "MT5 not connected"
+        brokers.append(_demo)
 
         # -- Live (Hantec) ------------------------------------------------
-        # FIX 2026-04-14: When RoboForex MT5 is disconnected, the offset used
-        # to calculate SL/TP is stale. Hantec has its own MT5 with a different
-        # offset. Recalculate SL/TP using point distances (offset-agnostic).
+        _live = {
+            "broker": "Hantec",
+            "account": None,
+            "attempted": False,
+            "result_state": "NOT_ATTEMPTED",
+            "ticket": None,
+            "error_code": None,
+            "error_text": "",
+        }
         if self.executor_live is not None and self.executor_live.connected:
+            attempted_any = True
+            _live["attempted"] = True
             _sl_live, _tp1_live, _tp2_live = sl, tp1, tp2
             if not self.executor.connected:
-                # RoboForex is down — recalculate stops using Hantec's current MT5 price
                 try:
                     import MetaTrader5 as _mt5_mod
                     _htick = _mt5_mod.symbol_info_tick(SYMBOL)
                     _hantec_price = (_htick.bid + _htick.ask) / 2 if _htick else 0
                     if _hantec_price > 0:
-                        # Preserve SL/TP distances in points from entry
                         _sl_dist  = abs(price - sl)
                         _tp1_dist = abs(price - tp1)
                         _tp2_dist = abs(price - tp2)
@@ -1003,18 +1173,17 @@ class EventProcessor:
                             _sl_live  = _hantec_price + _sl_dist
                             _tp1_live = _hantec_price - _tp1_dist
                             _tp2_live = _hantec_price - _tp2_dist
-                        log.info("HANTEC_OFFSET_FIX: robo_price=%.2f hantec_price=%.2f "
-                                 "sl=%.2f->%.2f tp1=%.2f->%.2f",
-                                 price, _hantec_price, sl, _sl_live, tp1, _tp1_live)
                 except Exception as _hx:
                     log.warning("Hantec offset fix failed: %s — using original stops", _hx)
-
             result_live = self.executor_live.open_position(
                 symbol=SYMBOL, direction=direction,
                 lot_size=_lot_total, sl=_sl_live, tp1=_tp1_live, tp2=_tp2_live,
                 explicit_lots=explicit_lots,
             )
-            if result_live["success"]:
+            _live["result_state"], _live["error_text"] = _state_from_result(result_live, True)
+            _tickets_live = [int(t or 0) for t in result_live.get("tickets", [])]
+            _live["ticket"] = next((t for t in _tickets_live if t > 0), None)
+            if result_live.get("success"):
                 t = result_live["tickets"]
                 prefix = f"[{label}] " if label else ""
                 print(f"[{ts}] {prefix}[LIVE] OPENED tickets={t}  entry={result_live['entry']:.2f}")
@@ -1036,8 +1205,29 @@ class EventProcessor:
                 print(f"[{ts}] [LIVE] ORDER FAILED: {result_live.get('error')}")
         else:
             print(f"[{ts}] [LIVE] Hantec not connected -- skipping live account")
+            _live["result_state"] = "BROKER_DISCONNECTED"
+            _live["error_text"] = "Hantec MT5 not connected"
+        brokers.append(_live)
 
-        return success_any
+        states = {b["result_state"] for b in brokers}
+        if "EXECUTED" in states and states.issubset({"EXECUTED", "NOT_ATTEMPTED"}):
+            overall = "EXECUTED"
+        elif "EXECUTED" in states or "PARTIAL" in states:
+            overall = "PARTIAL"
+        elif all(s == "BROKER_DISCONNECTED" for s in states):
+            overall = "BROKER_DISCONNECTED"
+        elif attempted_any:
+            overall = "FAILED"
+        else:
+            overall = "NOT_ATTEMPTED"
+
+        return {
+            "overall_state": overall,
+            "attempted": attempted_any,
+            "brokers": brokers,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "success_any": success_any,
+        }
 
     def _close_all_apex_positions(self, reason: str = "NEWS_EXIT_ALL") -> None:
         """Close all open APEX positions on all connected accounts (news gate EXIT_ALL)."""
@@ -1317,6 +1507,58 @@ class EventProcessor:
 
         except Exception as e:
             log.warning("metrics refresh error: %s", e)
+
+    def refresh_macro_context(self, reason: str = "") -> None:
+        """
+        Refresh macro directional context (M30 bias + M30 structural levels) from parquet.
+        Hard veto logic must use confirmed bias only.
+        """
+        try:
+            if not M30_BOXES_PATH.exists():
+                with self._lock:
+                    self.m30_bias = "unknown"
+                    self.m30_bias_confirmed = False
+                    self.provisional_m30_bias = "unknown"
+                return
+
+            df = pd.read_parquet(M30_BOXES_PATH)
+            if df.index.tz is None:
+                df.index = df.index.tz_localize("UTC")
+            if df.empty:
+                return
+
+            confirmed_bias, is_confirmed = derive_m30_bias(df, confirmed_only=True)
+            provisional_bias, _ = derive_m30_bias(df, confirmed_only=False)
+            row = df[df["m30_liq_top"].notna()].iloc[-1] if not df[df["m30_liq_top"].notna()].empty else df.iloc[-1]
+
+            with self._lock:
+                self.m30_bias = confirmed_bias
+                self.m30_bias_confirmed = is_confirmed
+                self.provisional_m30_bias = provisional_bias
+                if pd.notna(row.get("m30_liq_top")):
+                    self.m30_liq_top_gc = float(row.get("m30_liq_top"))
+                if pd.notna(row.get("m30_liq_bot")):
+                    self.m30_liq_bot_gc = float(row.get("m30_liq_bot"))
+                if self.m30_liq_top_gc is not None:
+                    self.m30_liq_top = round(self.m30_liq_top_gc - self._gc_xauusd_offset, 2)
+                if self.m30_liq_bot_gc is not None:
+                    self.m30_liq_bot = round(self.m30_liq_bot_gc - self._gc_xauusd_offset, 2)
+                self._macro_ctx_last_refresh = time.monotonic()
+                self._macro_ctx_refresh_needed = False
+
+            if reason:
+                log.info(
+                    "MACRO_REFRESH[%s]: confirmed_bias=%s provisional_bias=%s confirmed=%s",
+                    reason, confirmed_bias, provisional_bias, is_confirmed,
+                )
+        except Exception as e:
+            log.warning("refresh_macro_context failed: %s", e)
+
+    def request_macro_context_refresh(self, reason: str = "") -> None:
+        """Mark macro context for refresh and refresh immediately when possible."""
+        with self._lock:
+            self._macro_ctx_refresh_needed = True
+        self.refresh_macro_context(reason=reason)
 
     def _refresh_offset(self, xau_price: float) -> None:
         """
@@ -1794,10 +2036,16 @@ class EventProcessor:
         self._cycle_protection = _default_protection()
 
         # Per-direction lock: block if a CONFIRMED order was placed recently
+        # Refresh macro context when requested or stale cache (>60s)
+        if self._macro_ctx_refresh_needed or (time.monotonic() - self._macro_ctx_last_refresh > 60):
+            self.refresh_macro_context(reason=f"trigger_gate:{source}")
+
         with self._lock:
             lock_until       = self._direction_lock_until.get(direction, 0.0)
             d4h              = self._metrics.get("delta_4h", 0.0)
             m30_bias         = self.m30_bias
+            m30_bias_confirmed = self.m30_bias_confirmed
+            provisional_m30_bias = self.provisional_m30_bias
             m30_top_mt5      = self.m30_liq_top
             m30_bot_mt5      = self.m30_liq_bot
             m5_top_mt5       = self.liq_top
@@ -1807,6 +2055,20 @@ class EventProcessor:
             print(f"[{ts}] DIR_LOCK {direction}: {remaining:.0f}s remaining after last CONFIRMED")
             log.info("direction lock active for %s -- %.0fs remaining", direction, remaining)
             return
+
+        # Structural staleness hard block (confirmed fix): do not trade on stale M1 context.
+        try:
+            if SERVICE_STATE_PATH.exists():
+                _svc = json.loads(SERVICE_STATE_PATH.read_text(encoding="utf-8"))
+                if bool(_svc.get("m1_stale_critical", False)):
+                    m1_age = float(_svc.get("m1_age_s", -1))
+                    stale_reason = f"STRUCTURE_STALE_BLOCK: m1_stale_critical=true age={m1_age:.0f}s"
+                    print(f"[{ts}] {stale_reason}")
+                    log.warning("STRUCTURE_STALE_BLOCK %s: m1_stale_critical=true age=%.0fs", direction, m1_age)
+                    self._write_stale_block_decision(direction, price, stale_reason, source)
+                    return
+        except Exception as _svc_e:
+            log.debug("service_state stale check failed: %s", _svc_e)
 
         # -- PONTO -1: NEWS RELEASE FEATURE FLAG ------------------------------
         # Se um release económico HIGH/CRITICAL aconteceu nos últimos 5 min,
@@ -1865,13 +2127,24 @@ class EventProcessor:
             _a_sev = "NONE"
             _a_entry = "ALLOW"
             _a_pos = "HOLD"
+        if direction == "LONG":
+            _a_flow = "AGAINST_LONG" if _dm_stress in ("EXIT_LONG", "EXIT_ALL") else "FAVORS_LONG"
+        elif direction == "SHORT":
+            _a_flow = "AGAINST_SHORT" if _dm_stress in ("EXIT_SHORT", "EXIT_ALL") else "FAVORS_SHORT"
+        else:
+            _a_flow = "UNKNOWN"
+        _a_align = "OPPOSED" if "AGAINST" in _a_flow else ("ALIGNED" if "FAVORS" in _a_flow else "UNKNOWN")
         self._cycle_protection["anomaly"] = _build_protection_advice(
             source="DEFENSE_MODE",
-            alignment="UNKNOWN",   # defense mode does not know trade direction
+            alignment=_a_align,
             severity=_a_sev,
+            flow_relation=_a_flow,
             entry_action=_a_entry,
             position_action=_a_pos,
             reason=_dm_reason,
+            detected=bool(_dm_active),
+            side="UNKNOWN",
+            confidence=None,
         )
 
         if _dm_active:
@@ -1902,16 +2175,35 @@ class EventProcessor:
                 return
 
         # -- PONTO 1: M30 BIAS HARD GATE ---------------------------------------
-        # M30 macro bias is the judge. M5 signals contra-trend are rejected here,
-        # before gate.check() is ever called. "O M30 manda na Direção."
-        if m30_bias == "bullish" and direction == "SHORT":
-            print(f"[{ts}] M30_BIAS_BLOCK: bias=bullish -- SHORT rejected (contra-M30)")
-            log.info("M30_BIAS_BLOCK: bullish M30 bias rejects SHORT at %.2f", price)
-            return
-        if m30_bias == "bearish" and direction == "LONG":
-            print(f"[{ts}] M30_BIAS_BLOCK: bias=bearish -- LONG rejected (contra-M30)")
-            log.info("M30_BIAS_BLOCK: bearish M30 bias rejects LONG at %.2f", price)
-            return
+        # Confirmed fix:
+        #   - only CONFIRMED m30_bias may hard-block
+        #   - provisional/unconfirmed bias is telemetry only
+        _is_patch2a = (source == "PATCH2A")
+        if not m30_bias_confirmed:
+            if provisional_m30_bias in ("bullish", "bearish"):
+                log.info(
+                    "M30_BIAS_PROVISIONAL_ONLY: src=%s dir=%s provisional=%s confirmed=%s -> no hard block",
+                    source, direction, provisional_m30_bias, m30_bias
+                )
+                if _is_patch2a:
+                    print(f"[{ts}] PATCH2A_BIAS_CHECK: dir={direction} provisional={provisional_m30_bias} confirmed=unknown -> PASS")
+            elif _is_patch2a:
+                print(f"[{ts}] PATCH2A_BIAS_CHECK: dir={direction} provisional=unknown confirmed=unknown -> PASS")
+        else:
+            if m30_bias == "bullish" and direction == "SHORT":
+                print(f"[{ts}] M30_BIAS_BLOCK: bias=bullish(confirmed) -- SHORT rejected (contra-M30)")
+                log.info("M30_BIAS_BLOCK: confirmed bullish M30 bias rejects SHORT at %.2f (src=%s)", price, source)
+                if _is_patch2a:
+                    print(f"[{ts}] PATCH2A_BIAS_CHECK: dir={direction} confirmed_bias=bullish -> BLOCK")
+                return
+            if m30_bias == "bearish" and direction == "LONG":
+                print(f"[{ts}] M30_BIAS_BLOCK: bias=bearish(confirmed) -- LONG rejected (contra-M30)")
+                log.info("M30_BIAS_BLOCK: confirmed bearish M30 bias rejects LONG at %.2f (src=%s)", price, source)
+                if _is_patch2a:
+                    print(f"[{ts}] PATCH2A_BIAS_CHECK: dir={direction} confirmed_bias=bearish -> BLOCK")
+                return
+            if _is_patch2a:
+                print(f"[{ts}] PATCH2A_BIAS_CHECK: dir={direction} confirmed_bias={m30_bias} -> PASS")
 
         # -- PONTO 3: M30 BORDER ALIGNMENT -- REMOVED 2026-04-14 ----------------
         # Was blocking valid entries due to stale M30 level data.
@@ -2196,9 +2488,18 @@ class EventProcessor:
             }
             _decision_dict["decision"]["entry_mode"] = _strategy_ctx["entry_mode"]
             _decision_dict["decision"]["strategy_context"] = _strategy_ctx
-            if self._open_on_all_accounts(direction=direction, sl=sl, tp1=tp1, tp2=tp2,
-                                          gate_score=sc, explicit_lots=_dyn_lots,
-                                          strategy_context=_strategy_ctx):
+            _exec_report = self._open_on_all_accounts(
+                direction=direction, sl=sl, tp1=tp1, tp2=tp2,
+                gate_score=sc, explicit_lots=_dyn_lots,
+                strategy_context=_strategy_ctx,
+            )
+            _decision_dict["decision"]["execution"] = {
+                "overall_state": _exec_report.get("overall_state", "UNKNOWN_ERROR"),
+                "attempted": bool(_exec_report.get("attempted", False)),
+                "brokers": _exec_report.get("brokers", []),
+                "updated_at": _exec_report.get("updated_at"),
+            }
+            if _exec_report.get("success_any", False):
                 # Update decision with execution details
                 _tg_lots = _dyn_lots if _dyn_lots else [l1, l2, l3]
                 _decision_dict["decision"]["sl"] = round(sl, 2)
@@ -3312,9 +3613,12 @@ class EventProcessor:
                     return
 
             _dyn_lots_g = self._compute_session_lots(ice_aligned=False)
-            if self._open_on_all_accounts(direction=direction, sl=sl, tp1=tp1, tp2=tp2,
-                                          gate_score=0, label="GAMMA",
-                                          explicit_lots=_dyn_lots_g):
+            _gamma_exec = self._open_on_all_accounts(
+                direction=direction, sl=sl, tp1=tp1, tp2=tp2,
+                gate_score=0, label="GAMMA",
+                explicit_lots=_dyn_lots_g,
+            )
+            if _gamma_exec.get("success_any", False):
                 _tg_lots_g = _dyn_lots_g if _dyn_lots_g else [l1, l2, l3]
                 tg.notify_decision()
                 with self._lock:
@@ -3606,9 +3910,12 @@ class EventProcessor:
                     return
 
             _dyn_lots_d = self._compute_session_lots(ice_aligned=False)
-            if self._open_on_all_accounts(direction=direction, sl=sl, tp1=tp1, tp2=tp2,
-                                          gate_score=0, label="DELTA",
-                                          explicit_lots=_dyn_lots_d):
+            _delta_exec = self._open_on_all_accounts(
+                direction=direction, sl=sl, tp1=tp1, tp2=tp2,
+                gate_score=0, label="DELTA",
+                explicit_lots=_dyn_lots_d,
+            )
+            if _delta_exec.get("success_any", False):
                 _tg_lots_d = _dyn_lots_d if _dyn_lots_d else [l1, l2, l3]
                 tg.notify_decision()
                 with self._lock:
@@ -3723,9 +4030,18 @@ class EventProcessor:
             source="ICEBERG",
             alignment=_ice_align,
             severity=_ice_sev,
+            flow_relation=(
+                "FAVORS_LONG" if (_side_up in ("BUY", "BID", "LONG")) else
+                "FAVORS_SHORT" if (_side_up in ("SELL", "ASK", "SHORT")) else
+                "UNKNOWN"
+            ),
             entry_action=_ice_entry,
             position_action=_ice_pos,
             reason=f"ice side={side} prob={prob:.2f} refills={refills}",
+            detected=True,
+            side="BUY" if _side_up in ("BUY", "BID", "LONG") else ("SELL" if _side_up in ("SELL", "ASK", "SHORT") else "UNKNOWN"),
+            confidence=round(prob, 4),
+            refills=refills,
         )
 
         threading.Thread(
@@ -3886,6 +4202,7 @@ class EventProcessor:
         # Initial metrics load (blocking, one-time)
         print("Loading microstructure metrics (one-time ~1s)...")
         self._refresh_metrics()
+        self.refresh_macro_context(reason="start")
         print(f"  delta_4h={self._metrics['delta_4h']:+.0f}  ATR={self._metrics['atr']:.1f}pts"
               f"  NEAR band = {max(self._metrics['atr']*NEAR_ATR_FACTOR, NEAR_FLOOR_PTS):.1f}pts")
 

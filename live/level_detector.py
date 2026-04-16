@@ -204,40 +204,63 @@ def _get_m30_bias(m30_df: pd.DataFrame | None) -> str:
     UP breakout -> liq_top = fakeout_ext > box_high  -> bullish bias
     DN breakout -> liq_bot = fakeout_ext < box_low   -> bearish bias
     """
-    if m30_df is None:
-        return "unknown"
     try:
-        confirmed = m30_df[m30_df["m30_box_confirmed"] == True]
-        if confirmed.empty:
-            # No confirmed box -- try unconfirmed
-            unconf = m30_df[
-                (m30_df["m30_box_id"].notna()) &
-                (m30_df["m30_box_id"] > 0) &
-                (m30_df["m30_liq_top"].notna())
-            ]
-            if unconf.empty:
-                return "unknown"
-            last = unconf.iloc[-1]
-        else:
-            last = confirmed.iloc[-1]
-
-        box_high = last.get("m30_box_high", float("nan"))
-        box_low  = last.get("m30_box_low",  float("nan"))
-        liq_top  = last.get("m30_liq_top",  float("nan"))
-        liq_bot  = last.get("m30_liq_bot",  float("nan"))
-
-        import math
-        if math.isnan(liq_top) or math.isnan(box_high):
-            return "unknown"
-
-        if liq_top > box_high:    # UP breakout: liq_top extended above box ceiling
-            return "bullish"
-        elif not math.isnan(liq_bot) and not math.isnan(box_low) and liq_bot < box_low:
-            return "bearish"      # DN breakout: liq_bot extended below box floor
-        return "unknown"
+        bias, _is_confirmed = derive_m30_bias(m30_df, confirmed_only=False)
+        return bias
     except Exception as e:
         log.warning("_get_m30_bias failed: %s", e)
         return "unknown"
+
+
+def derive_m30_bias(
+    m30_df: pd.DataFrame | None, confirmed_only: bool = False
+) -> tuple[str, bool]:
+    """
+    Shared M30 bias derivation used by both entry and position-monitor paths.
+
+    Returns
+    -------
+    (bias, is_confirmed_source)
+      bias: "bullish" | "bearish" | "unknown"
+      is_confirmed_source: True when derived from a confirmed M30 box.
+    """
+    if m30_df is None:
+        return "unknown", False
+
+    def _classify(row) -> str:
+        import math
+        box_high = row.get("m30_box_high", float("nan"))
+        box_low  = row.get("m30_box_low",  float("nan"))
+        liq_top  = row.get("m30_liq_top",  float("nan"))
+        liq_bot  = row.get("m30_liq_bot",  float("nan"))
+
+        if math.isnan(liq_top) or math.isnan(box_high):
+            return "unknown"
+        if liq_top > box_high:
+            return "bullish"
+        if not math.isnan(liq_bot) and not math.isnan(box_low) and liq_bot < box_low:
+            return "bearish"
+        return "unknown"
+
+    try:
+        confirmed = m30_df[m30_df["m30_box_confirmed"] == True]
+        if not confirmed.empty:
+            return _classify(confirmed.iloc[-1]), True
+
+        if confirmed_only:
+            return "unknown", False
+
+        unconf = m30_df[
+            (m30_df["m30_box_id"].notna()) &
+            (m30_df["m30_box_id"] > 0) &
+            (m30_df["m30_liq_top"].notna())
+        ]
+        if unconf.empty:
+            return "unknown", False
+        return _classify(unconf.iloc[-1]), False
+    except Exception as e:
+        log.warning("derive_m30_bias failed: %s", e)
+        return "unknown", False
 
 
 # ---------------------------------------------------------------------------
@@ -367,7 +390,8 @@ def get_current_levels() -> dict | None:
 
     now_utc     = datetime.now(timezone.utc)
     daily_trend = _get_daily_trend()
-    m30_bias    = _get_m30_bias(m30_df)
+    m30_bias, m30_bias_confirmed = derive_m30_bias(m30_df, confirmed_only=True)
+    provisional_m30_bias, _ = derive_m30_bias(m30_df, confirmed_only=False)
     m30_macro   = _get_m30_macro_context(m30_df)
 
     # ------------------------------------------------------------------
@@ -405,6 +429,8 @@ def get_current_levels() -> dict | None:
                                              "m5_box_unconfirmed", daily_trend, prefix="m5")
                     result.update(m30_macro)
                     result["m30_bias"] = m30_bias
+                    result["m30_bias_confirmed"] = m30_bias_confirmed
+                    result["provisional_m30_bias"] = provisional_m30_bias
                     _validate_m5_vs_m30(result, m30_bias)
                     return result
 
@@ -441,6 +467,8 @@ def get_current_levels() -> dict | None:
                                      "m5_box", daily_trend, prefix="m5")
             result.update(m30_macro)
             result["m30_bias"] = m30_bias
+            result["m30_bias_confirmed"] = m30_bias_confirmed
+            result["provisional_m30_bias"] = provisional_m30_bias
             _validate_m5_vs_m30(result, m30_bias)
             return result
 
@@ -463,6 +491,8 @@ def get_current_levels() -> dict | None:
                                      "m5_box_unconfirmed", daily_trend, prefix="m5")
             result.update(m30_macro)
             result["m30_bias"] = m30_bias
+            result["m30_bias_confirmed"] = m30_bias_confirmed
+            result["provisional_m30_bias"] = provisional_m30_bias
             _validate_m5_vs_m30(result, m30_bias)
             return result
 
@@ -506,6 +536,8 @@ def get_current_levels() -> dict | None:
                                          "m30_box_unconfirmed", daily_trend, prefix="m30")
                 result.update(m30_macro)
                 result["m30_bias"] = m30_bias
+                result["m30_bias_confirmed"] = m30_bias_confirmed
+                result["provisional_m30_bias"] = provisional_m30_bias
                 return result
 
         if box_age_h > M30_STALE_WARN_H:
@@ -526,6 +558,8 @@ def get_current_levels() -> dict | None:
                                  "m30_box", daily_trend, prefix="m30")
         result.update(m30_macro)
         result["m30_bias"] = m30_bias
+        result["m30_bias_confirmed"] = m30_bias_confirmed
+        result["provisional_m30_bias"] = provisional_m30_bias
         return result
 
     # No confirmed M30 boxes
@@ -546,6 +580,8 @@ def get_current_levels() -> dict | None:
                                  "m30_box_unconfirmed", daily_trend, prefix="m30")
         result.update(m30_macro)
         result["m30_bias"] = m30_bias
+        result["m30_bias_confirmed"] = m30_bias_confirmed
+        result["provisional_m30_bias"] = provisional_m30_bias
         return result
 
     log.warning("No confirmed box in M5 or M30 -- system waiting for updaters")
