@@ -162,6 +162,79 @@ def read_trades_csv(path: Path) -> list[dict]:
         return []
 
 
+def read_canonical_executions(path: Path, limit: int = 200) -> list[dict]:
+    """
+    Read canonical execution snapshots from decision_log.jsonl.
+    Returns rows compatible across brokers/accounts for dashboard rendering.
+    """
+    if not path.exists():
+        return []
+    rows: list[dict] = []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.readlines()[-limit:]
+        for ln in lines:
+            try:
+                rec = json.loads(ln)
+            except Exception:
+                continue
+            dec = rec.get("decision", {})
+            ex = dec.get("execution", {})
+            for b in ex.get("brokers", []) or []:
+                rows.append({
+                    "decision_id": rec.get("decision_id"),
+                    "broker": b.get("broker"),
+                    "account": b.get("account"),
+                    "direction": dec.get("direction"),
+                    "action_side": dec.get("action_side"),
+                    "execution_state": b.get("result_state", ex.get("overall_state", "NOT_ATTEMPTED")),
+                    "ticket": b.get("ticket"),
+                    "error_text": b.get("error_text", ""),
+                    "created_at": rec.get("created_at") or rec.get("timestamp"),
+                    "updated_at": ex.get("updated_at") or rec.get("created_at") or rec.get("timestamp"),
+                })
+    except Exception as e:
+        log.warning("canonical execution read error [%s]: %s", path.name, e)
+    return rows
+
+
+def read_position_monitor_events(path: Path, limit: int = 200) -> list[dict]:
+    """Read canonical POSITION_MONITOR events from decision_log.jsonl."""
+    if not path.exists():
+        return []
+    events: list[dict] = []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.readlines()[-limit:]
+        for ln in lines:
+            try:
+                rec = json.loads(ln)
+            except Exception:
+                continue
+            if rec.get("event_source") != "POSITION_MONITOR":
+                continue
+            pe = rec.get("position_event", {})
+            events.append({
+                "decision_id": rec.get("decision_id"),
+                "timestamp": rec.get("timestamp"),
+                "event_type": pe.get("event_type"),
+                "action_type": pe.get("action_type"),
+                "direction_affected": pe.get("direction_affected"),
+                "dry_run": pe.get("dry_run"),
+                "t3_mode": pe.get("t3_mode"),
+                "reason": pe.get("reason"),
+                "ticket": pe.get("ticket"),
+                "broker": pe.get("broker"),
+                "account": pe.get("account"),
+                "execution_state": pe.get("execution_state"),
+                "execution_error": pe.get("execution_error"),
+                "result": pe.get("result"),
+            })
+    except Exception as e:
+        log.warning("position monitor event read error [%s]: %s", path.name, e)
+    return events
+
+
 def reconcile_trades_mt5(trades: list[dict], csv_path: Path, mt5_mod) -> None:
     """
     For trades with result='open', check MT5 deal history.
@@ -504,6 +577,16 @@ class BaseDashboardHandler(BaseHTTPRequestHandler):
                     self._send_json({"error": "parse_error", "detail": str(_e)}, 500)
             else:
                 self._send_json({"error": "not_found", "detail": "service_state.json does not exist"}, 404)
+            return
+
+        if path == "/api/executions":
+            _decision_log = Path(r"C:\FluxQuantumAI\logs\decision_log.jsonl")
+            self._send_json(read_canonical_executions(_decision_log, limit=300))
+            return
+
+        if path == "/api/pm_events":
+            _decision_log = Path(r"C:\FluxQuantumAI\logs\decision_log.jsonl")
+            self._send_json(read_position_monitor_events(_decision_log, limit=300))
             return
 
         # 4. Production AnomalyForge V2 status (Sprint 3.2)

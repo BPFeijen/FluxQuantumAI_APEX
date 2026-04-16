@@ -790,14 +790,18 @@ def _run_event_driven(args) -> None:
 
     # --- Layer 4: PositionMonitor (background thread) ---
     if _executor is not None:
+        pm_dry_run = (not execute)
         monitor = _PositionMonitor(
             executor      = _executor,
-            dry_run       = dry_run,
+            dry_run       = pm_dry_run,
             lot_size      = lot_size,
             executor_live = _executor_live if LIVE_EXECUTOR_AVAILABLE else None,
         )
         monitor.start()
-        print(_color("PositionMonitor started (background, 2s interval)", _CYAN))
+        print(_color(
+            f"PositionMonitor started (background, 2s interval, dry_run={pm_dry_run}, t3_mode from settings.json)",
+            _CYAN,
+        ))
     else:
         print(_color("WARNING: MT5Executor not available -- PositionMonitor disabled", _YELLOW))
 

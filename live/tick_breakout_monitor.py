@@ -163,6 +163,7 @@ class TickBreakoutMonitor:
             proc.liq_bot_gc = liq_bot_gc
             proc.liq_top    = round(liq_top_gc - proc._gc_xauusd_offset, 2)
             proc.liq_bot    = round(liq_bot_gc - proc._gc_xauusd_offset, 2)
+            proc._macro_ctx_refresh_needed = True
 
         ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
         log.info(
@@ -175,6 +176,11 @@ class TickBreakoutMonitor:
             f"  GC liq_top={liq_top_gc:.2f}  liq_bot={liq_bot_gc:.2f}"
             f"  MT5 liq_top={proc.liq_top:.2f}  liq_bot={proc.liq_bot:.2f}"
         )
+        try:
+            if hasattr(proc, "request_macro_context_refresh"):
+                proc.request_macro_context_refresh(reason=f"tick_breakout:{reason}")
+        except Exception as e:
+            log.warning("TickBreakout macro refresh request failed: %s", e)
 
     # ------------------------------------------------------------------
     # State machine step
