@@ -1,0 +1,134 @@
+# PC AIML Applied Data Science with Python
+
+  Meeting started: 3/21/2026, 9:33:32 AM
+  Duration: 31 minutes
+  Participants: Barbara Pereira Feijen ., geetika sethi
+
+  [View original transcript](https://app.tactiq.io/api/2/u/m/r/BVao2hNKBDvXhbowrDXC?o=txt)
+
+    ## Generate Action Items
+
+# Action Items
+
+- [ ] Everyone — Upload the notebook to the lab environment and type "done" in the chat once uploaded.
+- [ ] Everyone — Rename the dataset file to exactly "house prices.csv" in your lab workspace.
+- [ ] Everyone — Load the dataset using pandas.read_csv("house prices.csv") and confirm successful load.
+- [ ] Everyone — Inspect the loaded data using head(), tail(), info(), and describe() to verify rows, columns, data types, and basic statistics.
+- [ ] Everyone — Check for missing values using isnull().sum() for each column and report if any non-zero counts are found.
+- [ ] Everyone — Execute the notebook step-by-step from the start through section 3.2 (follow the prescribed order) and type "done" in the chat when finished.
+- [ ] Geetika — Ensure the "house prices.csv" file is available/shared in the chat for all learners and monitor that everyone has access.
+
+
+## Detailed summary
+
+# Detailed Meeting Summary — PC AIML Applied Data Science with Python (2026-03-21)
+
+## Purpose
+- Walk-through and hands-on implementation of data wrangling steps in the course notebook using a provided dataset (house prices.csv). Emphasis on the correct order of steps because this order will carry forward to future machine learning and deep learning notebooks.
+
+## Key Logistics and Immediate Tasks
+- Instructor: geetika sethi.
+- Learners were asked to upload the notebook/file to Simply Learn Labs and to type "done" in the chat when upload completed. A 2-minute timer was set for the upload (00:00–00:44: initial upload prompt).
+- Multiple confirmations of completion from a learner (Barbara): "Done" at 00:44, 06:38 and again "done" at 30:59. One confirmation of understanding: "yes" at 17:55.
+- Learners instructed to rename the file to exactly house prices.csv before using pandas.read_csv so loading will succeed.
+- Instructional drill: execute the notebook from the start up to section 3.2 (do not edit the notebook). Learners were given 6 minutes to complete execution and told to type "done" as soon as finished.
+- Instructor muted audio while typing on the screen during the drill.
+
+## Data Wrangling Concepts Covered
+- Overview of the data wrangling pipeline: collection, inspection, cleaning, transformation, outlier handling, and preparation for downstream algorithms (machine learning / deep learning).
+- Specific operations and purpose:
+  - Collection: load dataset via pandas (import pandas; pd.read_csv('house prices.csv')).
+  - Inspection: use head(), tail(), info(), and describe() to examine rows, data types, counts, and descriptive statistics.
+  - Cleaning: identify and then handle missing values and duplicates (cleaning is required before using data). Instructor emphasized that cleaning steps follow inspection.
+  - Transformation: scaling and normalization methods to prepare datasets for downstream algorithms.
+  - Outlier handling: must be addressed as part of wrangling (discussed conceptually).
+- Emphasis on DMASO (Data, Method, Arguments, Syntax, Outcome) as the framework for implementing methods and functions in pandas on DataFrames.
+
+## Dataset Details (as described in the session)
+- File name to use: house prices.csv (learners must rename uploaded file to this name).
+- Dataset dimensions and types (per info() output explained by instructor):
+  - 18 columns total (index 0 to 17).
+  - 4 columns with decimal data type.
+  - 9 columns with integer data type.
+  - 5 columns with text data type.
+  - 4600 rows in each column.
+  - No null values reported (isnull().sum() produced zeros for each column).
+
+## Inspection and Indexing Demonstrations
+- head() and tail(): show top 5 and last 5 rows respectively.
+- info(): shows column counts, data types, and null counts (in this dataset info() indicated no nulls and 4600 rows per column).
+- describe(): used to compute descriptive statistics (count, mean, std, min, 25%, 50%, 75%, max) — instructor stressed descriptive statistics apply only to numeric columns.
+- iloc usage and examples:
+  - iloc[0] returns the first row (index 0) across all columns.
+  - iloc[10] returns the 11th row (index 10) across all columns.
+  - iloc can accept row index only, or row, column (row, col), and supports slice notation (start:stop) — stop is exclusive.
+  - iloc default behavior targets rows unless columns are specified.
+
+## Missing Value Checking and Cleaning Status
+- Instructor demonstrated isnull() and isnull().sum() to check for missing values by column.
+- In this particular dataset, the sum of nulls for each column was shown as 0 (no missing values). Therefore, while cleaning was discussed, no imputation/removal was necessary for missing values in this dataset as inspected.
+- Instructor reminded learners that if missing values were present, handling strategies would be taught following the completion of the executed sections.
+
+## Emphasis on Order of Operations
+- Instructor repeatedly stressed the critical importance of the order of operations in data science projects (collection → inspection → cleaning → transformation → modeling) and said this same order will be used across all future machine learning and deep learning notebooks and projects.
+- Learners were instructed to internalize and follow the exact order; the instructor stated they would not repeat the order in future sessions (for the next ~20 sessions covering ML and DL).
+
+## Execution Instructions and Constraints
+- Execute the notebook from the start up to section 3.2 (inclusive) without making edits.
+- Stick strictly to the provided file house prices.csv as the input dataset.
+- Complete the execution and indicate completion by typing "done" in the chat.
+
+## Timeline / Notable Timestamps from the Session
+- 00:00 – Upload prompt and 2-minute timer set for notebook upload.
+- 02:49–04:51 – High-level description of data wrangling steps and DMASO.
+- 05:33–06:38 – File upload instructions; rename to house prices.csv and load into Simply Learn Labs.
+- 15:01–17:55 – Detailed inspection methods (head, tail, info, describe) and numeric-only requirement for descriptive stats.
+- 18:58–21:26 – iloc usage examples and indexing behavior explained.
+- 22:13–23:20 – Missing value checking via isnull() and isnull().sum(); current dataset reported zero missing values.
+- 26:20–29:03 – Instructor typed the order on screen and assigned the drill to execute up to section 3.2; 6 minutes were granted for the drill.
+
+## Actions Requested of Learners (Clear Deliverables)
+- Ensure the file is named house prices.csv and uploaded to Simply Learn Labs.
+- Load the dataset using pandas.read_csv('house prices.csv').
+- Execute the notebook from the start up to section 3.2 without editing the notebook.
+- After completing execution, type "done" in the chat.
+
+If you want, I can extract the exact code snippets and commands referenced (pandas import, read_csv, head/tail/info/describe, iloc patterns, isnull().sum()) as a quick reference list for your notebook execution.
+
+  
+
+  
+    ## Highlights
+
+    > 26:20 geetika sethi: critical point that has to be informed to all the learners, and that critical point is that the order in the beginning is important. The order in the beginning sets the tone and the alignment with the data science project.
+
+  ## Transcript
+
+  00:00 geetika sethi: Very critical for AI upskilling that is needed. So let's quickly have all the downs in the chat box and we're setting up the timer of 2 min. We have 2 min for all the learners to upload the notebook, and please type done in the chat box. And the notebook is in the… chat box for all the learners. Thank you.
+00:44 Barbara Pereira Feijen .: Done
+01:49 geetika sethi: 40 seconds before we begin data wrangling all what we have learned so far is going to get implemented to work with the data, to wrangle it, to process it and prepare it for the next final steps, which is the next module series, which is machine learning. And then followed by that is going to be deep learning, et cetera. Thank
+02:49 geetika sethi: So for data wrangling, we see that we are going to be dealing with the set of processes that include collection. To collect the data, to inspect the data. Inspect means we have to ask questions to the data. And once we ask questions, we know more about our data sets that we're dealing with. And once we have the data in our hand, we have to clean the data before we can use it. So data would not be implemented as it is. It has to undergo the process of cleaning, and once it has been cleaned, cleaned for what? Clean for duplicates, cleaned for missing values, etc, and then we move forward to transformation of the data. That means we actually transform or change the values.
+03:48 geetika sethi: In a way, like, for example, scaling and normalization methods that are going to prepare the data set for the handling of the downstream algorithms. So the transformation or the changes in the data set. is to prepare it for the downstream algorithms. We have seen. And we have discussed outliers. We have to handle the outliers in the data set. And all these implementations, which are part of data wrangling is handled through the methods and the functions, and hence the DMASO holds true for the implementation. of data wrangling, and Dmas. So is the data, the method, the arguments, the syntax, and the outcome that we have learned already. So all these will be implemented through the methods and functions in pandas that can be implemented on pandas data frames altogether.
+04:51 geetika sethi: Then we are looking at some data handling strategies. As you can see how to merge the data, how to aggregate the data, etc. So it is all about data. And let's get working on this one. As a first implementation, which is going to be, let's see, we are looking at loading of the data set. And we have some idea about loading already. We know that we have to first import the pandas and then load the data using read CSV method. And the name of the file that we're going to start working with is house prices.csv. So let's quickly share that file in the chat box. All the learners will be.
+05:33 geetika sethi: uploading this file, house prices, and let's quickly come to providing this in the chat box to all the learners. So please load this to your labs, Simply Learn Labs, and please type done in the chat box. Thank you.
+06:38 Barbara Pereira Feijen .: done
+15:01 geetika sethi: Okay, thank you everybody. So the good news is that we already know how to load the data set. We have our file ready in our system. You will have to rename the file, and the file has to be house prices.csv. And once we come to house prices.csv file, which is the input given for the method read CSV, the loading is going to be feasible.
+15:22 geetika sethi: And we know exactly how to load. And we have already studied in our statistical implementations how to use the data inspection methods, the head and the tail and the info and the basic statistics which is described and the data types. which is going to be inspecting your data to know the data types. This implementation also has been already completed previously in the previous notebook. So we see that for the head method top 5 rows are displayed for the tail method. The last 5 rows. are displayed as you can see. So let's scroll down to the inspection output. The tail method is going to be displaying last 5 rows.
+16:07 geetika sethi: And for all the columns under study. And so the first output is ending over here for all the columns. The second output is starting over here, the date, the last. 5 rows, as you can see, the index value is showing for all the columns. As you can see. And then we have the info method which we have already discussed. Info is going to give you the information about the total number of columns. So we have 4 plus 9 plus 5, which is 4 columns with data type. of decimals, 9 columns of data type integer and 5 columns of data type, the text data.
+16:56 geetika sethi: And once this is clear, we can also see the total of 9 plus 5 is 14 plus 4 is 18. So 0 to 17 index is going to be 18 columns. And each column has 4600 rows, and there is no null value in any of the rows at all. So this is again the output of the info method. And then we come to looking at the descriptive statistics, the fundamental statistics where we are looking at the percentiles.
+17:30 geetika sethi: Of each column. Now, descriptive statistics is possible only and only where the data type is going to be numeric data. Everybody, all the yeses in the chat box. Please, only and only when the data type is the numeric data. Can the descriptive statistics be calculated, right? Everybody, all the yeses. So the fundamental statistics of calculation of the count, the total number of values in a given row, the mean value, etc, as you can see. So for the 600 rows, 4600 rows, 4600 rows.
+17:55 Barbara Pereira Feijen .: yes
+18:05 geetika sethi: As you can see is the count, the mean for each column. Is printed and calculated standard deviation, the minimum value, the maximum value, and the data distribution. So the shape of distribution or dispersion. It's also handled through the percentile. So what is the, you know, details about the 25 percentile of the data, 50 percentile of the data, and the 75 percentile of the data set, right? So now, once that is done, we are good to move forward to access the roles using iLOC. ILOC, we already know, we have studied, but it is part of data wrangling. That is why it is put over here. I lock is going to be. You are going to locate the value with the index. implementation, or the index value. So we are going to be.
+18:58 geetika sethi: looking at the ILOC of 0, which is your row, or you're looking at the 1st data value 0 index means 1st data value right? So once we are providing this information, let's quickly access and check. It is going to provide us the first row, first row. for all the 18 columns, as you can see. So all the 18 columns first row is provided. So by default I lock is only going to deal with row. But if we provide the row comma. Column index value, then it is going to deal accordingly. So this is a quick, gentle revision on iLok implementation, and ILOC is going to be dealing with locating the data values. So in this case, for example.
+19:52 geetika sethi: This is going to be looking at the index number 10, that is me, that means the 11th. Row of the data. So let's come to this one and check the information. Yes, so for all the columns, 11th row is going to be displayed, as you can see. But let's not forget we have already studied. That ILOC can be used in different ways and a gentle reminder and revision on that. You can only have the row value, so this is the strategy, as you can see, and the result is also here in front of you. And then we are going to be looking at another implementation which is going to be row, comma, column.
+20:41 geetika sethi: And row comma column is going to be. dealing with the index value for the row and index value for the column. Another strategy is where we have the sign of, let's say, colon, comma colon, that means all the rows, all the columns. Another strategy is where we have the range provided and that range. is going to be using the starting index till the last value and not including the last value for the rows starting index and the last value, and not including the last value for the rows. So I lock 3 examples or 2 examples that they have shown is the default ILOC.
+21:26 geetika sethi: Which is going to take only the index value for the row, but remaining possibilities we have already covered in the previous chapters, and that's a gentle reminder over here. Then, once the I lock is handled, we are good to move forward with checking the missing value. So here. Onwards, the data cleaning is going to start. So data inspection. is going to be after the data loading. and data loading. data inspection, and now data cleaning. So first thing 1st, before we can clean the data set, we have to check for the missing values. First thing first. So… This is a sample they have shown. This sample is not from.
+22:13 geetika sethi: The house prices.csv. This sample is a simple diagrammatic sample, a diagram, or a table rather, to put it in better words, a table representation, hypothetical, and they're showing that missing values are going to be. The values which are not present, and they're also called as the null values as a gentle reminder. So to 1st. deal with the missing values, we have to check whether the missing values are present or not, and these missing values are going to be. As follows. Number one, we are going to 1st check using the is null method, whether they are present or not.
+23:00 geetika sethi: But if they are present, what is the total count, so the sum? So for each column, the sum is coming out to be 0, that means there are no missing values, and we saw that 4600 values were present in each column already, 4600 rows. The info method showed us already.
+23:20 geetika sethi: But if the missing values were actually present, then that has to be handled, and that handling we are going to be learning after we complete the implementation until over here. So let's come to the drill, everybody, until section 3.2. We have to complete all the execution step by step. We cannot do any edits. We are sticking to house prices.csv only. So just a minute. I'm going to start typing on the screen for the drill. And my audio is going to be on mute. Thank you.
+26:20 geetika sethi: critical point that has to be informed to all the learners, and that critical point is that the order in the beginning is important. The order in the beginning sets the tone and the alignment with the data science project.
+26:38 geetika sethi: And this order of implementation is also exactly same to same implementation for the machine learning and the deep learning projects also, which are going to be the next set of session series that we will be dealing with. So what is that order exactly? So the order is now I'm typing that on the screen
+28:10 geetika sethi: So now the task is to execute in correct order and remember the order here itself. The task is to execute. Until section 3.2 from the start of the notebook. And then we will go to handling the cleaning process. We have not started the cleaning process to do the cleaning. We have only started the process of checking off the data set, whether the missing values or not, whether the missing values are present or not. And hence, we can plan for the cleaning of the data set. And cleaning is extremely critical for data wrangling. So let's go ahead and execute until section 3.2 from the start of the notebook. But the order is critical, and we will not repeat the details.
+29:03 geetika sethi: about the order in about next 20 sessions, machine learning and deep learning, every single notebook, every single data science project. This is going to be the order. Thank you. So we're giving good. 6 minutes to all the learners to complete the execution. This is critical. You have to learn the order here itself, and please type done as soon as the execution is completed. Thank you
+30:59 Barbara Pereira Feijen .: done
+  

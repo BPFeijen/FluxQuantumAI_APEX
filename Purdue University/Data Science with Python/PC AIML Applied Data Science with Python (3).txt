@@ -1,0 +1,84 @@
+# PC AIML Applied Data Science with Python
+
+  Meeting started: 2/28/2026, 9:42:08 AM
+  Duration: 4 minutes
+  Participants: Barbara Pereira Feijen ., geetika sethi
+
+  [View original transcript](https://app.tactiq.io/api/2/u/m/r/W4GrnEAwfYbfXTLXZmxM?o=txt)
+
+    ## Generate Action Items
+
+# Action Items
+
+- [ ] Complete the notebook end-to-end and mark as done in chat (Everyone)
+- [ ] Request the Learning Success Manager to join for 5 minutes and communicate the project submission deadline (geetika)
+- [ ] Ensure the Learning Success Manager is prepared to answer learners' questions about the project submission (Learning Success Manager)
+- [ ] Create and share a downloadable link to the notebook in the chat for all learners (geetika)
+- [ ] Confirm the notebook attachment is visible in the chat and accessible to participants (geetika)
+
+## Detailed summary
+
+# Meeting Summary — "PC AIML Applied Data Science with Python"
+
+**Date / Start time:** 2026-02-28, started at 08:42:08 UTC
+
+## Attendance
+- geetika sethi (host/instructor)
+- Barbara Pereira Feijen
+
+## Duration
+- Short meeting fragment captured in transcript (first ~5 minutes).
+
+## Key points discussed
+
+- 00:00 — Quick administrative/icebreaker request:
+  - geetika asked participants to "put the dance in the chat box" in the last 5 minutes (likely an informal/engagement request).
+
+- 00:56 — Participant concern about deadlines:
+  - Barbara reported she received an email stating a project submission end date of 07/03 and asked: "What project submission?!"
+
+- 03:28 — Instructor response and plan (geetika):
+  - Reassured participants not to worry about the project submission date at this time.
+  - Emphasized priority: complete the notebook first.
+  - Stated intention to request the learning success manager to join for 5 minutes to communicate about the project submission date and answer questions.
+  - Asked learners to first complete the notebook and to type "done" when finished.
+  - Urged learners to quickly execute the notebook end-to-end in the last two minutes.
+  - Mentioned she was posting the notebook link again in the chat (noted timestamp: 4.02) and asked participants to execute it.
+
+- 04:57 — Notebook distribution details (geetika):
+  - Noted the notebook was in the chat box as an attachment; participants could download and upload it to their systems.
+  - Offered to create and share a separate link with all learners and asked for a moment to do so.
+
+## Decisions / Agreements
+- Immediate priority agreed by instructor: complete and execute the notebook end-to-end during the session.
+- Instructor will contact the learning success manager to clarify project submission details and have them join briefly to answer questions.
+
+## Action items
+- Participants (all learners):
+  - Execute the provided notebook end-to-end and type "done" in the chat when complete (requested by geetika).
+
+- geetika:
+  - Request the learning success manager to join for ~5 minutes to explain the project submission date and respond to questions.
+  - Share the notebook link (she indicated she would create and share a link in addition to the chat attachment).
+
+## Open questions / Unresolved items
+- What is the official project submission deadline? (Barbara raised this; instructor will have the learning success manager clarify.)
+- Whether additional instructions or requirements for the project submission exist beyond the notebook work (not answered in the captured transcript).
+
+## Notes / Observations
+- Communication channel for the notebook is the meeting chat — a downloadable attachment was posted; an alternative sharable link was promised.
+- The meeting focused on immediate hands-on work (the notebook) with administrative clarification (project deadline) deferred to the learning success manager.
+
+If you want, I can convert this into a shorter one‑line summary or extract the specific action items with assignees and suggested deadlines.
+
+  
+
+  
+
+  ## Transcript
+
+  00:00 geetika sethi: Everybody, please put the dance in the chat box last 5 min for the
+00:56 Barbara Pereira Feijen .: Hello! I've just got an email about project submission end date for 07/03. What project submission?!
+03:28 geetika sethi: Hi everybody, please kindly don't worry about the project submission date. Let's complete the notebook first, because the project submission date, I will request the learning success manager to come, and he will communicate. I will request them to be present for 5 min and answer all your questions. Just be ready for that. And in the meantime, please first complete this notebook type done. Last two minutes, please. We'll be grateful. Yes, I'm putting the notebook once again in the chat box, 4.02, last 2 minutes, please quickly execute it end to end, please. Thank you.
+04:57 geetika sethi: So instead of sharing the link, we have it in the chat box. Please look at the chat box. It is attached there. You can download and upload in your system. I can also create a link and share it with all my learners. So just give me a second
+  
