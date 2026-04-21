@@ -1,9 +1,17 @@
+"""
+DEPRECATED 2026-04-21: this test asserted behavior of _should_apply_m30_bias_block
+which was reverted in ROLLBACK-001. Kept for historical reference. Skip all tests.
+"""
 from __future__ import annotations
 
 import importlib
 import sys
 import types
 from pathlib import Path
+
+import pytest
+
+pytestmark = pytest.mark.skip(reason="bypass logic reverted in ROLLBACK-001")
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
