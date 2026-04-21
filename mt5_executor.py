@@ -61,6 +61,8 @@ GATE_COLUMNS = [
 # ---------------------------------------------------------------------------
 MT5_AVAILABLE = False
 mt5 = None
+_mt5 = None
+_init_kwargs: dict = {"timeout": 10000}
 
 def _load_env_robo(path: str = ".env"):
     import os
@@ -90,16 +92,17 @@ try:
     # Deferred initialization: do NOT call mt5.initialize() at import time.
     # mt5.initialize() can segfault in Session 0 (Windows service) when the terminal
     # is not running in the same session. Connection happens lazily via reconnect().
-    _init_kwargs: dict = {"timeout": 10000}
     if _ROBO_TERMINAL:
         _init_kwargs["path"]     = _ROBO_TERMINAL
         _init_kwargs["login"]    = ACCOUNT
         _init_kwargs["server"]   = _ROBO_SERVER
         if _ROBO_PASSWORD:
             _init_kwargs["password"] = _ROBO_PASSWORD
+    mt5 = _mt5
     log.info("MT5 module loaded — connection deferred to first reconnect() call")
 except ImportError:
-    _mt5 = None
+    mt5 = None
+    MT5_AVAILABLE = False
     log.warning("MetaTrader5 not installed — executor running in dry-run mode")
 
 
@@ -124,9 +127,25 @@ def _split_lots(total: float) -> tuple[float, float, float]:
 
 
 def _get_tick(symbol: str) -> Optional[object]:
-    if not MT5_AVAILABLE:
+    if mt5 is None:
         return None
-    tick = mt5.symbol_info_tick(symbol)
+
+    try:
+        sinfo = mt5.symbol_info(symbol)
+        if sinfo is None:
+            log.error("symbol_info failed for %s", symbol)
+            return None
+
+        if not getattr(sinfo, "visible", True):
+            if not mt5.symbol_select(symbol, True):
+                log.error("symbol_select failed for %s: %s", symbol, mt5.last_error())
+                return None
+
+        tick = mt5.symbol_info_tick(symbol)
+    except Exception as e:
+        log.error("symbol tick fetch failed for %s: %s", symbol, e)
+        return None
+
     if tick is None:
         log.error("No tick for %s: %s", symbol, mt5.last_error())
     return tick
@@ -156,25 +175,44 @@ def _ensure_logs():
 class MT5Executor:
 
     def __init__(self):
-        self.connected = MT5_AVAILABLE
+        self.connected = False
         _ensure_logs()
 
     def reconnect(self) -> bool:
         """Attempt to reconnect to MT5 if disconnected. Called before execution."""
+        global mt5, MT5_AVAILABLE
+
         if self.connected:
             return True
         try:
+            if _mt5 is None:
+                self.connected = False
+                mt5 = None
+                MT5_AVAILABLE = False
+                return False
+
             if _mt5.initialize(**_init_kwargs):
                 info = _mt5.account_info()
                 if info and info.login == ACCOUNT:
+                    mt5 = _mt5
+                    MT5_AVAILABLE = True
                     self.connected = True
                     log.info("MT5 RECONNECTED — account %d", ACCOUNT)
                     return True
-                else:
-                    log.warning("MT5 reconnect: account mismatch")
+
+                self.connected = False
+                mt5 = None
+                MT5_AVAILABLE = False
+                log.warning("MT5 reconnect: account mismatch")
             else:
+                self.connected = False
+                mt5 = None
+                MT5_AVAILABLE = False
                 log.debug("MT5 reconnect failed: %s", _mt5.last_error())
         except Exception as e:
+            self.connected = False
+            mt5 = None
+            MT5_AVAILABLE = False
             log.debug("MT5 reconnect error: %s", e)
         return False
 
@@ -279,6 +317,14 @@ class MT5Executor:
                 "type_time":   mt5.ORDER_TIME_GTC,
                 "type_filling": mt5.ORDER_FILLING_IOC,
             }
+
+            chk = mt5.order_check(req)
+            if chk is None or chk.retcode != mt5.TRADE_RETCODE_DONE:
+                err = chk.comment if chk else str(mt5.last_error())
+                log.error("Leg %d order_check failed: %s", i + 1, err)
+                tickets.append(0)
+                continue
+
             res = mt5.order_send(req)
             if res is None or res.retcode != mt5.TRADE_RETCODE_DONE:
                 err = res.comment if res else str(mt5.last_error())
