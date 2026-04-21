@@ -264,42 +264,94 @@ def derive_m30_bias(
     -------
     (bias, is_confirmed_source)
       bias: "bullish" | "bearish" | "unknown"
-      is_confirmed_source: True when derived from a confirmed M30 box.
+      is_confirmed_source: True when derived from a confirmed M30 box that
+      is still structurally valid against the latest price.
     """
-    if m30_df is None:
+    if m30_df is None or m30_df.empty:
         return "unknown", False
 
     def _classify(row) -> str:
         import math
+
         box_high = row.get("m30_box_high", float("nan"))
         box_low  = row.get("m30_box_low",  float("nan"))
         liq_top  = row.get("m30_liq_top",  float("nan"))
         liq_bot  = row.get("m30_liq_bot",  float("nan"))
 
-        if math.isnan(liq_top) or math.isnan(box_high):
-            return "unknown"
-        if liq_top > box_high:
+        bull_ext = (
+            not math.isnan(liq_top)
+            and not math.isnan(box_high)
+            and liq_top > box_high
+        )
+        bear_ext = (
+            not math.isnan(liq_bot)
+            and not math.isnan(box_low)
+            and liq_bot < box_low
+        )
+
+        if bull_ext and not bear_ext:
             return "bullish"
-        if not math.isnan(liq_bot) and not math.isnan(box_low) and liq_bot < box_low:
+        if bear_ext and not bull_ext:
             return "bearish"
         return "unknown"
 
+    def _price_vs_box_bias(row, current_gc: float | None) -> str:
+        if current_gc is None:
+            return "unknown"
+
+        try:
+            box_high = row.get("m30_box_high", None)
+            box_low  = row.get("m30_box_low", None)
+
+            if pd.notna(box_high) and current_gc > float(box_high):
+                return "bullish"
+            if pd.notna(box_low) and current_gc < float(box_low):
+                return "bearish"
+        except Exception:
+            return "unknown"
+
+        return "unknown"
+
     try:
+        current_gc = _get_current_gc_price()
+
         confirmed = m30_df[m30_df["m30_box_confirmed"] == True]
-        if not confirmed.empty:
-            return _classify(confirmed.iloc[-1]), True
-
-        if confirmed_only:
-            return "unknown", False
-
-        unconf = m30_df[
+        latest_struct = m30_df[
             (m30_df["m30_box_id"].notna()) &
             (m30_df["m30_box_id"] > 0) &
             (m30_df["m30_liq_top"].notna())
         ]
-        if unconf.empty:
+
+        latest_row = latest_struct.iloc[-1] if not latest_struct.empty else m30_df.iloc[-1]
+
+        # ----- confirmed path -----
+        if not confirmed.empty:
+            last_confirmed = confirmed.iloc[-1]
+            confirmed_bias = _classify(last_confirmed)
+            structural_now = _price_vs_box_bias(latest_row, current_gc)
+
+            # If confirmed bias is contradicted by live structure, invalidate it
+            if confirmed_bias in ("bullish", "bearish"):
+                if structural_now != "unknown" and structural_now != confirmed_bias:
+                    if confirmed_only:
+                        return "unknown", False
+                else:
+                    return confirmed_bias, True
+
+        if confirmed_only:
             return "unknown", False
-        return _classify(unconf.iloc[-1]), False
+
+        # ----- live/provisional path -----
+        latest_bias = _classify(latest_row)
+        if latest_bias in ("bullish", "bearish"):
+            return latest_bias, False
+
+        structural_now = _price_vs_box_bias(latest_row, current_gc)
+        if structural_now in ("bullish", "bearish"):
+            return structural_now, False
+
+        return "unknown", False
+
     except Exception as e:
         log.warning("derive_m30_bias failed: %s", e)
         return "unknown", False

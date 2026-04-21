@@ -2205,6 +2205,51 @@ class EventProcessor:
             for k in stale_keys:
                 del self._dwell_state[k]
 
+    def _should_apply_m30_bias_block(
+        self,
+        direction: str,
+        strategy_reason: str,
+        source: str,
+    ) -> tuple[bool, str]:
+        """
+        Decide whether M30 confirmed bias is allowed to hard-block this trade.
+
+        Authority model:
+          - CONTINUATION  -> hard block
+          - PULLBACK      -> hard block
+          - OVEREXTENSION -> no hard block (strategy explicitly allows counter-bias reversal)
+          - RANGE_BOUND   -> no hard block
+          - unknown       -> conservative default = hard block only if clearly trend-following context
+        """
+        sr = (strategy_reason or "").upper()
+
+        # Explicit counter-trend reversal mode already authorized by strategy
+        if "OVEREXTENDED" in sr or "REVERSAL ALLOWED" in sr:
+            return False, "OVEREXTENSION_REVERSAL"
+
+        # Mean-reversion/range logic should not be killed by macro bias veto
+        if "RANGE_BOUND" in sr:
+            return False, "RANGE_BOUND"
+
+        # Trend-following modes: bias should remain authoritative
+        if "CONTINUATION" in sr:
+            return True, "CONTINUATION"
+        if "PULLBACK" in sr:
+            return True, "PULLBACK"
+
+        # PATCH2A is trend-continuation by definition
+        if source == "PATCH2A":
+            return True, "PATCH2A_CONTINUATION"
+
+        # Conservative fallback:
+        # if strategy reason says TRENDING but does not classify the subtype clearly,
+        # keep the hard block
+        if "TRENDING" in sr:
+            return True, "TRENDING_UNCLASSIFIED"
+
+        # Default: do not let bias veto unknown/non-trend cases absolutely
+        return False, "DEFAULT_NO_HARD_BLOCK"
+
     # ------------------------------------------------------------------
     # Gate trigger
     # ------------------------------------------------------------------
@@ -2374,10 +2419,12 @@ class EventProcessor:
                 return
 
         # -- PONTO 1: M30 BIAS HARD GATE ---------------------------------------
-        # Confirmed fix:
+        # Correct authority model:
         #   - only CONFIRMED m30_bias may hard-block
         #   - provisional/unconfirmed bias is telemetry only
+        #   - hard block depends on strategy context
         _is_patch2a = (source == "PATCH2A")
+
         if not m30_bias_confirmed:
             if provisional_m30_bias in ("bullish", "bearish"):
                 log.info(
@@ -2389,20 +2436,40 @@ class EventProcessor:
             elif _is_patch2a:
                 print(f"[{ts}] PATCH2A_BIAS_CHECK: dir={direction} provisional=unknown confirmed=unknown -> PASS")
         else:
-            if m30_bias == "bullish" and direction == "SHORT":
-                print(f"[{ts}] M30_BIAS_BLOCK: bias=bullish(confirmed) -- SHORT rejected (contra-M30)")
-                log.info("M30_BIAS_BLOCK: confirmed bullish M30 bias rejects SHORT at %.2f (src=%s)", price, source)
+            _apply_bias_block, _bias_mode = self._should_apply_m30_bias_block(
+                direction=direction,
+                strategy_reason=strategy_reason,
+                source=source,
+            )
+
+            if not _apply_bias_block:
+                log.info(
+                    "M30_BIAS_SOFT_BYPASS: src=%s dir=%s confirmed_bias=%s mode=%s reason=%s",
+                    source, direction, m30_bias, _bias_mode, strategy_reason
+                )
+            else:
+                if m30_bias == "bullish" and direction == "SHORT":
+                    print(f"[{ts}] M30_BIAS_BLOCK: bias=bullish(confirmed) -- SHORT rejected (contra-M30)")
+                    log.info(
+                        "M30_BIAS_BLOCK: confirmed bullish M30 bias rejects SHORT at %.2f (src=%s mode=%s)",
+                        price, source, _bias_mode
+                    )
+                    if _is_patch2a:
+                        print(f"[{ts}] PATCH2A_BIAS_CHECK: dir={direction} confirmed_bias=bullish -> BLOCK")
+                    return
+
+                if m30_bias == "bearish" and direction == "LONG":
+                    print(f"[{ts}] M30_BIAS_BLOCK: bias=bearish(confirmed) -- LONG rejected (contra-M30)")
+                    log.info(
+                        "M30_BIAS_BLOCK: confirmed bearish M30 bias rejects LONG at %.2f (src=%s mode=%s)",
+                        price, source, _bias_mode
+                    )
+                    if _is_patch2a:
+                        print(f"[{ts}] PATCH2A_BIAS_CHECK: dir={direction} confirmed_bias=bearish -> BLOCK")
+                    return
+
                 if _is_patch2a:
-                    print(f"[{ts}] PATCH2A_BIAS_CHECK: dir={direction} confirmed_bias=bullish -> BLOCK")
-                return
-            if m30_bias == "bearish" and direction == "LONG":
-                print(f"[{ts}] M30_BIAS_BLOCK: bias=bearish(confirmed) -- LONG rejected (contra-M30)")
-                log.info("M30_BIAS_BLOCK: confirmed bearish M30 bias rejects LONG at %.2f (src=%s)", price, source)
-                if _is_patch2a:
-                    print(f"[{ts}] PATCH2A_BIAS_CHECK: dir={direction} confirmed_bias=bearish -> BLOCK")
-                return
-            if _is_patch2a:
-                print(f"[{ts}] PATCH2A_BIAS_CHECK: dir={direction} confirmed_bias={m30_bias} -> PASS")
+                    print(f"[{ts}] PATCH2A_BIAS_CHECK: dir={direction} confirmed_bias={m30_bias} -> PASS")
 
         # -- PONTO 3: M30 BORDER ALIGNMENT -- REMOVED 2026-04-14 ----------------
         # Was blocking valid entries due to stale M30 level data.
