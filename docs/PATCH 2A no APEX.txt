@@ -1,0 +1,59 @@
+Sim, implemente o PATCH 2A no APEX, mas como patch tático de produção para cobrir trend days e não como versão conceitual final do NextGen.
+
+Diretrizes obrigatórias:
+
+1. Prioridade de lógica:
+
+* Se o preço estiver FORA da M30 box na direção da daily_trend, avaliar CONTINUATION primeiro.
+* Nesse cenário, não quero que _near_level() continue favorecendo trigger contra-trend por simples proximidade de liq_top/liq_bot.
+
+2. Guardrails:
+
+* Manter TODOS os guardrails já descritos no patch2a_logic:
+
+  * displacement válido
+  * delta real >= 80
+  * exhaustion / overextension
+  * iceberg contra forte bloqueia
+  * cooldown
+  * dwell stale respeitado
+    Nada disso pode ser afrouxado.
+
+3. Estrutura:
+
+* Basear o trigger na estrutura macro M30 / phase engine estável, não em reatividade curta de M5.
+* PATCH 2A serve para quando o sistema está em EXPANSION/TREND alinhado e ficou cego por falta de expansion line.
+
+4. Observabilidade:
+
+* Quero log explícito de:
+
+  * reason=PATCH2A_CONTINUATION
+  * phase
+  * daily_trend
+  * box_high / box_low
+  * price_vs_box
+  * displacement
+  * delta
+  * exhaustion result
+  * iceberg veto ou pass
+* Dashboard / Telegram / decision log precisam refletir exatamente a mesma decisão.
+
+5. Segurança:
+
+* Manter kill switch.
+* Se houver ambiguidade de direção, SKIP.
+* Não transformar isso em breakout chase permissivo.
+
+6. Escopo:
+
+* Implementar só no APEX agora.
+* Não mexer em P1/P2/NextGen neste momento.
+* Nosso foco é estabilizar produção e corrigir os gaps que impedem entrada em trend day.
+
+Depois da implementação, me entregue:
+
+* diff resumido
+* sequência exata da prioridade de decisão no tick loop
+* exemplos de quando entra e quando bloqueia
+* quais cenários do dia de hoje passariam com PATCH 2A e quais continuariam bloqueados

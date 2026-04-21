@@ -1,0 +1,172 @@
+{
+  "timestamp": "2026-04-20T14:56:44.256754+00:00",
+  "price_mt5": 4810.1,
+  "price_gc": 4827.5,
+  "gc_mt5_offset": 20.33,
+  "context": {
+    "phase": "TREND",
+    "daily_trend": "short",
+    "m30_bias": "bullish",
+    "m30_bias_confirmed": true,
+    "provisional_m30_bias": "bullish",
+    "m30_box_mt5": [
+      4818.07,
+      4824.87
+    ],
+    "m30_fmv_mt5": null,
+    "m30_atr14": 34.75,
+    "liq_top_mt5": 4824.87,
+    "liq_bot_mt5": 4811.92,
+    "liq_top_gc": 4845.2,
+    "liq_bot_gc": 4832.25,
+    "session": "NY",
+    "delta_4h": -1133.0
+  },
+  "trigger": {
+    "type": "ALPHA",
+    "level_type": "liq_bot",
+    "level_price_mt5": 4811.92,
+    "proximity_pts": 1.8,
+    "near_level_source": "unknown"
+  },
+  "gates": {
+    "v1_zone": {
+      "status": "PASS",
+      "reason": ""
+    },
+    "v2_l2": {
+      "status": "NEUTRAL",
+      "score": -1.0
+    },
+    "v3_momentum": {
+      "status": "OK",
+      "delta_4h": -1121.0,
+      "score": 2
+    },
+    "v4_iceberg": {
+      "status": "NEUTRAL",
+      "score": 3,
+      "type": "large_order",
+      "aligned": true
+    }
+  },
+  "decision": {
+    "action": "EXEC_FAILED",
+    "direction": "LONG",
+    "action_side": "BUY",
+    "trade_intent": "ENTRY_LONG",
+    "message_semantics_version": "v1_canonical",
+    "reason": "GO LONG but NO broker executed: robo=connected hantec=connected",
+    "total_score": 5,
+    "execution": {
+      "overall_state": "FAILED",
+      "attempted": true,
+      "brokers": [
+        {
+          "broker": "RoboForex",
+          "account": null,
+          "attempted": true,
+          "result_state": "IPC_TIMEOUT",
+          "ticket": null,
+          "error_code": null,
+          "error_text": "No market tick"
+        },
+        {
+          "broker": "Hantec",
+          "account": null,
+          "attempted": true,
+          "result_state": "FAILED",
+          "ticket": null,
+          "error_code": null,
+          "error_text": "All legs failed"
+        }
+      ],
+      "updated_at": "2026-04-20T14:56:54.828172+00:00"
+    },
+    "sl": 4790.1,
+    "tp1": 4830.1,
+    "tp2": 4860.1,
+    "lots": [
+      0.02,
+      0.02,
+      0.01
+    ],
+    "entry_mode": "OVEREXTENSION",
+    "strategy_context": {
+      "entry_mode": "OVEREXTENSION",
+      "daily_trend": "short",
+      "phase": "TREND",
+      "strategy_mode": "[?] TRENDING_DN"
+    }
+  },
+  "expansion_lines_mt5": [
+    4814.1,
+    4807.75,
+    4806.2,
+    4813.95,
+    4818.45,
+    4821.1,
+    4818.0,
+    4819.1
+  ],
+  "micro_atr_proxy": 34.75,
+  "protection": {
+    "anomaly": {
+      "detected": false,
+      "side": "UNKNOWN",
+      "alignment": "ALIGNED",
+      "severity": "NONE",
+      "flow_relation": "FAVORS_LONG",
+      "entry_action": "ALLOW",
+      "position_action": "HOLD",
+      "reason": "NORMAL",
+      "confidence": null,
+      "refills": null,
+      "shadow_only": true,
+      "source": "DEFENSE_MODE",
+      "rule_based": true
+    },
+    "iceberg": {
+      "detected": false,
+      "side": "UNKNOWN",
+      "alignment": "UNKNOWN",
+      "severity": "NONE",
+      "flow_relation": "UNKNOWN",
+      "entry_action": "UNKNOWN",
+      "position_action": "UNKNOWN",
+      "reason": "",
+      "confidence": null,
+      "refills": null,
+      "shadow_only": true,
+      "source": "ICEBERG",
+      "rule_based": true
+    }
+  },
+  "anomaly": {
+    "detected": false,
+    "side": "UNKNOWN",
+    "alignment": "ALIGNED",
+    "severity": "NONE",
+    "flow_relation": "FAVORS_LONG",
+    "entry_action": "ALLOW",
+    "position_action": "HOLD",
+    "reason": "NORMAL",
+    "confidence": null,
+    "refills": null,
+    "shadow_only": true,
+    "source": "DEFENSE_MODE",
+    "rule_based": true
+  },
+  "iceberg": {
+    "detected": true,
+    "side": "UNKNOWN",
+    "alignment": "ALIGNED",
+    "severity": "CRITICAL",
+    "confidence": 3.0,
+    "refills": 0,
+    "entry_action": "UNKNOWN",
+    "position_action": "UNKNOWN"
+  },
+  "decision_id": "6be3c394",
+  "created_at": "2026-04-20T14:56:54.828172+00:00"
+}

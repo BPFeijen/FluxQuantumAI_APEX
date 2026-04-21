@@ -1,0 +1,186 @@
+Phase 1 §5.2 Discovery — READ-ONLY
+Generated: 2026-04-21 (post Pre-Flight ratification)
+Scope: canonical writers, emission sites, heartbeat, M30_BIAS_BLOCK confirm
+===============================================================================
+
+(i) CANONICAL WRITERS INVENTORY
+-------------------------------------------------------------------------------
+
+TWO canonical-publish functions (as Barbara cited) + TWO inline duplicates.
+
+1. event_processor.py : EventProcessor._write_decision(self, decision_data: dict)
+   - Lines 676-702
+   - Writes: decision_live.json (atomic tmp→rename) + decision_log.jsonl (append)
+   - Adds `decision_id` + `created_at` to payload
+   - Does NOT call Telegram (callers invoke tg.notify_* separately)
+   - Does NOT update service_state.json (that is heartbeat's job)
+   - Error handling: log.error on write failure, does not re-raise
+
+2. position_monitor.py : PositionMonitor._publish_canonical_pm_event(self, event_payload)
+   - Lines 2004-2066
+   - Writes: decision_live.json (atomic tmp→rename, GUARDED by self._canonical_lock)
+     + decision_log.jsonl (append)
+   - Calls tg.notify_decision() INLINE after successful write (lines 2056-2063)
+   - Error handling: Telegram failure → log.debug (the invisibility bug for Fix #6)
+   - action="PM_EVENT"; used for SHIELD / TP1_HIT / TP2_HIT / SL_HIT / REGIME_FLIP /
+     PULLBACK_START / PULLBACK_END_EXIT / L2_DANGER / T3_EXIT / NEWS_EXIT
+
+DUPLICATE (non-delegating) canonical writers — architectural drift:
+
+3. event_processor.py : NEWS_EXIT PM inline block (lines 1289-1339)
+   - Builds its own _canonical_payload, writes decision_live + decision_log
+     inline without delegating to _publish_canonical_pm_event.
+   - Comment "Fase 4 Scope B.2: Emit PM_EVENT NEWS_EXIT via canonical flow"
+     suggests it should use #2, but does its own I/O instead.
+
+4. hedge_manager.py : HedgeManager inline canonical emit (lines 432-497)
+   - "Fase 5 Scope B.4 — canonical PM_EVENT flow paths"
+   - Owns its own DECISION_LIVE_PATH/DECISION_LOG_PATH constants (line 65-66)
+   - Third copy of the same atomic-write + append pattern
+
+Implication for Phase 1 implementation: §5.3 calls for creating
+`_publish_decision_canonical(decision)` as THE single funnel. Recommended
+approach (subject to ratification):
+   a) Extract a shared helper (module-level or a mixin utility) that both
+      EventProcessor and PositionMonitor/HedgeManager call.
+   b) OR keep #1 and #2 as the two sanctioned entry points and retire #3 and
+      #4 by having them delegate to one of them.
+   Option (a) is cleaner but has larger blast radius. Option (b) is minimum
+   diff and respects the "surgical / minimum diff" §0 mission statement.
+
+
+(ii) EMISSION SITES + canonical vs silent
+-------------------------------------------------------------------------------
+
+Entry-path (event_processor.py) emission sites, graded:
+
+  line   site description                                       canonical?
+  -----  ------------------------------------------------------ -----------
+  1044   _write_stale_block_decision → _write_decision(payload)  YES  (calls #1)
+  2267   call of above from entry path                           YES  (via above)
+  2290   NEWS_VETO — print + log.warning, no _write_decision    NO   (silent)
+  2393   M30_BIAS_BLOCK SHORT — print+log.info, return          NO   (SILENT) ★ FIX #1
+  2399   M30_BIAS_BLOCK LONG  — print+log.info, return          NO   (SILENT) ★ FIX #1
+  2438   op_blocked — print+log.info, return                    NO   (silent)
+  2445   _check_pre_entry_gates BLOCK — print+log.info, return  NO   (silent)
+  2526   v1 = "ZONE_FAIL" → feeds 2620 _write_decision           YES  (BLOCK_V1_ZONE visible)
+  2620   gate chain final BLOCK → _write_decision                YES  (Fase 2 canonical)
+  2623   print "[{ts}] BLOCK: {decision.reason}" + tg.notify    (cosmetic; 2620 already wrote)
+  2735   ABORT_STALE entry — print + log.warning                 NO   (silent)
+  2777   EXECUTED (broker success) → _write_decision             YES
+  2848   EXEC_FAILED (all brokers refused) → _write_decision     YES
+  3844   GAMMA ABORT_STALE                                       NO   (silent)
+  3847   GAMMA ABORT_STALE inverse                               NO   (silent)
+  4142   DELTA ABORT_STALE                                       NO   (silent)
+  4145   DELTA ABORT_STALE inverse                               NO   (silent)
+  4399   FEED_DEAD — print + continue; no _write_decision       NO   (SILENT) ★ FIX #5
+
+PM-event (position_monitor.py) emissions: ALL routed through #2
+_publish_canonical_pm_event (line 2002 is the single dispatcher) → canonical ✓
+Exception: NEWS_EXIT is emitted from event_processor line 1289 block (duplicate #3).
+
+NEW silent-return sites discovered beyond the Sprint plan:
+   - NEWS_VETO (2290)
+   - op_blocked (2438)
+   - pre-entry gate block (2445)
+   - ABORT_STALE entry (2735)
+   - GAMMA ABORT_STALE ×2 (3844/3847)
+   - DELTA ABORT_STALE ×2 (4142/4145)
+
+These are out-of-scope for Fix #1 (M30_BIAS_BLOCK only) and Fix #5 (FEED_DEAD
+only) per the sprint doc, but the Phase 1 canonical-path infrastructure should
+be designed so these can be retrofitted in a later sprint without new plumbing.
+Flagged for ML Engineer: do we want Fix #3 to be the universal funnel (future-
+proof) or keep the scope strictly to the current plan?
+
+
+(iii) HEARTBEAT THREAD LIVE STATUS
+-------------------------------------------------------------------------------
+
+Implementation: event_processor.py lines 725-855.
+   - def _write_service_state(self)            lines 725-833
+   - def _start_heartbeat_thread(self)         lines 835-855
+
+Design (already correct per Sprint §5.3):
+   - Daemon thread, name "heartbeat"
+   - 30-second sleep between iterations (line 851)
+   - Runs while self._running is True
+   - Writes full state (feed_status, m1_age_s, m5_age_s, m30_age_s, bias,
+     delta_4h, defense_tier, mt5 connection status, d1h4 shadow, etc.)
+   - Atomic write (tmp→rename) at lines 826-833
+   - Also invokes tg.notify_health_check() each cycle (anti-spam 15min inside)
+   - Started from EventProcessor.start() at line 4502
+
+Live evidence that it IS running right now:
+   - service_stderr.log head (pre-Sprint read):
+        HEARTBEAT_LOOP_ENTERED pid=1908
+        HEARTBEAT_THREAD_STARTED pid=1908
+        SERVICE_STATE_WRITE_OK path=C:\FluxQuantumAI\logs\service_state.json
+        (repeats every ~30s; thousands of occurrences in log)
+   - service_state.json mtime at 2026-04-21 07:44 UTC+2 (≈5:44 UTC, ≤60s fresh)
+   - service_state.json fields currently populated: m1_stale=False,
+     m1_age_s=56.2, m30_bias=bullish, defense_tier=NORMAL, phase=TREND
+   - PID in stderr log (1908) differs from current run_live PID (4516) because
+     the log file was rotated/started earlier; heartbeat reinitialises each
+     service restart. Current heartbeat is alive under PID 4516.
+
+Conclusion: heartbeat already independent of tick/feed loop. Sprint §5.3's
+directive ("Modify so it updates service_state.json on a timer thread, NOT
+inside tick loop") is ALREADY the current state. Only schema extensions needed
+for Phase 3 (telegram sub-dict) and Phase 6 (news_gate sub-dict). No structural
+change required.
+
+
+(iv) M30_BIAS_BLOCK SITE CONFIRMATION
+-------------------------------------------------------------------------------
+
+Barbara cited event_processor.py:2392-2403. CONFIRMED exact.
+
+  2380:   _is_patch2a = (source == "PATCH2A")
+  2381:   if not m30_bias_confirmed:
+  2382:       if provisional_m30_bias in ("bullish", "bearish"):
+  2383-86:       log.info("M30_BIAS_PROVISIONAL_ONLY: …  -> no hard block")
+  2387-88:       if _is_patch2a: print("PATCH2A_BIAS_CHECK: … -> PASS")
+  2389-90:   elif _is_patch2a: print("PATCH2A_BIAS_CHECK: … -> PASS")
+  2391:   else:   # bias is CONFIRMED
+  2392:       if m30_bias == "bullish" and direction == "SHORT":
+  2393:           print(f"[{ts}] M30_BIAS_BLOCK: bias=bullish(confirmed) -- SHORT rejected (contra-M30)")
+  2394:           log.info("M30_BIAS_BLOCK: confirmed bullish M30 bias rejects SHORT at %.2f (src=%s)", price, source)
+  2395-96:           if _is_patch2a: print("PATCH2A_BIAS_CHECK: … -> BLOCK")
+  2397:           return                           ← silent exit, no _write_decision
+  2398:       if m30_bias == "bearish" and direction == "LONG":
+  2399:           print(f"[{ts}] M30_BIAS_BLOCK: bias=bearish(confirmed) -- LONG rejected (contra-M30)")
+  2400:           log.info("M30_BIAS_BLOCK: confirmed bearish M30 bias rejects LONG at %.2f (src=%s)", price, source)
+  2401-02:           if _is_patch2a: print("PATCH2A_BIAS_CHECK: … -> BLOCK")
+  2403:           return                           ← silent exit
+  2404-05:       if _is_patch2a: print("PATCH2A_BIAS_CHECK: … -> PASS")
+
+Gate semantics:
+   - PROVISIONAL bias already does NOT hard-block (lines 2381-2390): logs
+     "M30_BIAS_PROVISIONAL_ONLY" and falls through. This is Phase 4's
+     "provisional never hard-blocks" policy — ALREADY implemented.
+   - CONFIRMED bias hard-blocks contra-direction (2392-2403). This is the
+     surface to be wrapped by Fix #1's canonical emission.
+
+Both return paths (2397, 2403) are the ONLY silent-return paths inside the
+M30_BIAS_BLOCK branch. No other early-return hides here.
+
+Context values available at this point (usable for the canonical payload
+per Phase 2's skeleton):
+   - direction (param), price (param), source (param)
+   - m30_bias, m30_bias_confirmed, provisional_m30_bias (local vars)
+   - ts (local formatted timestamp)
+   - self._metrics, self.liq_top, self.liq_bot, self.box_high/low,
+     self.daily_trend, etc. (all available on self, same as used by
+     _write_stale_block_decision at line 981+)
+
+The existing _write_stale_block_decision at 981 is an excellent template —
+identical input surface (direction, price, reason, trigger/source), same
+context builder pattern; Phase 2's M30_BIAS_BLOCK emission can mirror its
+structure one-for-one, swapping reason and context fields.
+
+
+===============================================================================
+END OF DISCOVERY. No code modified. No services touched. Capture PIDs intact.
+STOP — awaiting Claude ratification per Barbara's instruction.
+===============================================================================

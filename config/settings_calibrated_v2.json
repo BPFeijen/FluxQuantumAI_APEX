@@ -1,0 +1,15 @@
+{
+  "dom_imbalance_threshold": 17.030568,
+  "delta_flip_min_bars": 120,
+  "cascade_N_levels": 3,
+  "cascade_window": 10,
+  "vol_climax_multiplier": 0.68206,
+  "min_rs_conditions": 3,
+  "delta_weakening_threshold": 0.139486,
+  "pullback_max_atr_mult": 0.300399,
+  "level_dedup_tolerance_atr": 0.020057,
+  "level_dedup_tolerance_pts": 0.2,
+  "cooldown_atr_mult": null,
+  "cooldown_pts": null,
+  "iceberg_proxy_threshold": 0.914972
+}

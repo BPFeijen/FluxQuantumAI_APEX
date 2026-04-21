@@ -1,0 +1,102 @@
+﻿# TASK: DISCOVERY READ-ONLY — Inventário Completo de Thresholds APEX Live
+
+## CONTEXTO
+Barbara (PO) e Claude (ML Engineer) precisam de uma lista completa 
+e estruturada de TODOS os thresholds e parâmetros numéricos que o 
+APEX live usa para tomar decisões de trading. Esta lista é pré-requisito 
+para um trabalho de recalibração data-driven baseado em metodologia 
+académica (Purdue — supervised learning, classification, ensemble).
+
+## MODO DE OPERAÇÃO
+**READ-ONLY ABSOLUTO.**
+- NÃO modificar nenhum ficheiro.
+- NÃO reiniciar serviços.
+- NÃO tocar em portas 8000, 8002, 8088 nem no processo APEX live (PID 16300).
+- Apenas LER, LISTAR, DOCUMENTAR.
+- Se dúvida sobre se uma ação é read-only → PARAR e perguntar à Barbara.
+
+## OBJETIVO
+Produzir UM ficheiro MD em /mnt/user-data/outputs/ chamado 
+APEX_THRESHOLDS_INVENTORY_20260419.md contendo uma tabela exaustiva 
+de TODOS os parâmetros numéricos que o APEX usa para decisões.
+
+## ESCOPO
+Incluir na tabela QUALQUER valor numérico usado por:
+- Decisões de entrada (gates, filters, signal confirmation)
+- Decisões de saída (stops, targets, trailing, early exit)
+- Posicionamento (lot sizing, max positions, scaling)
+- Risk management (max drawdown, daily loss, exposure limits)
+- Filtros temporais (session windows, cooldowns, news blocks)
+- Filtros de volatilidade, volume, liquidez
+- Detecção de padrões (iceberg, collision, absorption, etc.)
+
+Incluir parâmetros de:
+- C:\FluxQuantumAI\config\settings.json
+- C:\FluxQuantumAI\live\ (todos os módulos — ler código, procurar 
+  constantes numéricas e valores default em parâmetros de função)
+- Qualquer .env, .yaml, .ini, .cfg no projeto
+- Valores hardcoded no código que afetam decisões
+
+EXCLUIR:
+- Parâmetros técnicos de infraestrutura (timeouts de rede, buffers, 
+  batch sizes de log)
+- Constantes matemáticas fixas (π, conversões de unidade)
+- Parâmetros do APEX_NextGen (apex_nextgen\) — esse é projeto separado
+
+## FORMATO DA TABELA (obrigatório)
+
+Tabela em Markdown com estas colunas, UMA LINHA por parâmetro:
+
+| # | Nome Técnico | Ficheiro:Linha | Valor Atual | O Que Controla (1 frase leiga) | Tipo | Unidade |
+|---|---|---|---|---|---|---|
+
+Onde:
+- **Nome Técnico** = nome EXATO como aparece no código/config
+- **Ficheiro:Linha** = path absoluto + número de linha exata
+- **Valor Atual** = valor numérico presente HOJE
+- **O Que Controla** = explicação em linguagem simples que a Barbara (PO 
+  não-dev) consegue entender. NÃO usar jargão técnico não explicado.
+- **Tipo** = Entrada | Saída | Risk | Sizing | Filtro Temporal | Detecção | Outro
+- **Unidade** = pontos | ticks | % | segundos | minutos | lotes | boolean | N/A
+
+## SECÇÕES ADICIONAIS DO RELATÓRIO
+
+### Secção 1 — Tabela principal (acima)
+
+### Secção 2 — Agrupamento por Tipo
+Lista os parâmetros agrupados por Tipo (todas as entradas juntas, 
+saídas juntas, etc.) para facilitar leitura.
+
+### Secção 3 — Thresholds com Valor Igual ou Muito Próximo
+Identificar grupos de thresholds que têm valores parecidos — 
+pode indicar correlação ou redundância a investigar.
+
+### Secção 4 — Thresholds Sem Documentação
+Lista os parâmetros cujo código NÃO tem comentário/docstring a 
+explicar a razão do valor. Isto é candidato a recalibração prioritária.
+
+### Secção 5 — Sinalização de Risco
+Identificar qualquer parâmetro que:
+- Tenha comentário tipo "TODO", "FIXME", "HACK", "temp value"
+- Pareça valor "mágico" (ex: 0.7 sem explicação)
+- Tenha sido alterado recentemente (últimos 30 dias) via git log
+
+### Secção 6 — GAPS / Ambiguidades
+Listar qualquer coisa que não conseguiu determinar com certeza, 
+paths que não existem, valores que aparecem em múltiplos sítios 
+com versões diferentes, etc.
+
+## GOLDEN RULES
+1. Read-only absoluto, sem exceção.
+2. Paths absolutos sempre.
+3. Se aparecer parâmetro que não percebes a função → escreve "FUNÇÃO 
+   NÃO CLARA — ver código" em vez de inventar.
+4. NÃO propor recalibração. NÃO julgar qualidade. Apenas INVENTARIAR.
+5. Se número total de parâmetros > 50, ainda assim lista todos. 
+   Estimativa realista é 30-80 parâmetros.
+
+## ENTREGÁVEL ÚNICO
+/mnt/user-data/outputs/APEX_THRESHOLDS_INVENTORY_20260419.md
+
+## TEMPO ESTIMADO
+60-120 minutos de trabalho. Se demorar mais, reporta progresso parcial.

@@ -1,0 +1,17 @@
+{
+  "timestamp": "20260420_101330",
+  "action": "near_level_direction_aware_fix_C1_universal",
+  "sprint": "entry_logic_fix_20260420",
+  "level_detector.py": {
+    "pre_hash": "e2e0d7d112afbca64be29aa6dd285e99",
+    "post_hash": "5e74e1ad645093cf325ada188c952f44",
+    "pre_lines": 589,
+    "post_lines": 773
+  },
+  "event_processor.py": {
+    "pre_hash": "3501c260350f135b0fa38b78b6e8c8d1",
+    "post_hash": "1ade483a9389bf8354782857fd9d4f8f",
+    "pre_lines": 4430,
+    "post_lines": 4589
+  }
+}

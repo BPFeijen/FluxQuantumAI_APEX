@@ -1,0 +1,130 @@
+﻿C:\FluxQuantumAI\live\base_dashboard_server.py:167: Read canonical execution snapshots from decision_log.jsonl.
+C:\FluxQuantumAI\live\base_dashboard_server.py:202: """Read canonical POSITION_MONITOR events from decision_log.jsonl."""
+C:\FluxQuantumAI\live\base_dashboard_server.py:561: _live_path = Path(r"C:\FluxQuantumAI\logs\decision_live.json")
+C:\FluxQuantumAI\live\base_dashboard_server.py:568: self._send_json({"error": "not_found", "detail": "decision_live.json does not exist yet (no gate check executed)"}, 404)
+C:\FluxQuantumAI\live\base_dashboard_server.py:572: _health_path = Path(r"C:\FluxQuantumAI\logs\service_state.json")
+C:\FluxQuantumAI\live\base_dashboard_server.py:579: self._send_json({"error": "not_found", "detail": "service_state.json does not exist"}, 404)
+C:\FluxQuantumAI\live\base_dashboard_server.py:583: _decision_log = Path(r"C:\FluxQuantumAI\logs\decision_log.jsonl")
+C:\FluxQuantumAI\live\base_dashboard_server.py:584: self._send_json(read_canonical_executions(_decision_log, limit=300))
+C:\FluxQuantumAI\live\base_dashboard_server.py:588: _decision_log = Path(r"C:\FluxQuantumAI\logs\decision_log.jsonl")
+C:\FluxQuantumAI\live\base_dashboard_server.py:589: self._send_json(read_position_monitor_events(_decision_log, limit=300))
+C:\FluxQuantumAI\live\event_processor.py:224: DECISION_LIVE_PATH = Path("C:/FluxQuantumAI/logs/decision_live.json")
+C:\FluxQuantumAI\live\event_processor.py:225: DECISION_LOG_PATH  = Path("C:/FluxQuantumAI/logs/decision_log.jsonl")
+C:\FluxQuantumAI\live\event_processor.py:226: SERVICE_STATE_PATH = Path("C:/FluxQuantumAI/logs/service_state.json")
+C:\FluxQuantumAI\live\event_processor.py:469: feed_monitor=None,    # Optional[FeedHealthMonitor] -- gate suspended when FEED_DEAD
+C:\FluxQuantumAI\live\event_processor.py:607: # Single source of truth remains decision_live.json / decision_log.jsonl.
+C:\FluxQuantumAI\live\event_processor.py:673: # Single Source of Truth: decision_live.json + decision_log.jsonl
+C:\FluxQuantumAI\live\event_processor.py:676: def _write_decision(self, decision_data: dict) -> None:
+C:\FluxQuantumAI\live\event_processor.py:679: 1. decision_live.json  — latest state (atomic overwrite)
+C:\FluxQuantumAI\live\event_processor.py:680: 2. decision_log.jsonl  — append-only audit trail
+C:\FluxQuantumAI\live\event_processor.py:687: # 1. decision_live.json (atomic: tmp -> rename)
+C:\FluxQuantumAI\live\event_processor.py:688: DECISION_LIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
+C:\FluxQuantumAI\live\event_processor.py:690: tmp = DECISION_LIVE_PATH.with_suffix(".tmp")
+C:\FluxQuantumAI\live\event_processor.py:693: tmp.replace(DECISION_LIVE_PATH)
+C:\FluxQuantumAI\live\event_processor.py:695: log.error("decision_live.json write failed: %s", e)
+C:\FluxQuantumAI\live\event_processor.py:697: # 2. decision_log.jsonl (append)
+C:\FluxQuantumAI\live\event_processor.py:699: with open(DECISION_LOG_PATH, "a", encoding="utf-8") as f:
+C:\FluxQuantumAI\live\event_processor.py:702: log.error("decision_log.jsonl append failed: %s", e)
+C:\FluxQuantumAI\live\event_processor.py:725: def _write_service_state(self) -> None:
+C:\FluxQuantumAI\live\event_processor.py:727: Write service health heartbeat to service_state.json.
+C:\FluxQuantumAI\live\event_processor.py:728: Called every 30s from independent heartbeat thread (NOT tick loop).
+C:\FluxQuantumAI\live\event_processor.py:788: "last_heartbeat_at": now.isoformat(),
+C:\FluxQuantumAI\live\event_processor.py:826: SERVICE_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+C:\FluxQuantumAI\live\event_processor.py:828: tmp = SERVICE_STATE_PATH.with_suffix(".tmp")
+C:\FluxQuantumAI\live\event_processor.py:831: tmp.replace(SERVICE_STATE_PATH)
+C:\FluxQuantumAI\live\event_processor.py:833: log.error("service_state.json write failed: %s", e)
+C:\FluxQuantumAI\live\event_processor.py:835: def _start_heartbeat_thread(self) -> None:
+C:\FluxQuantumAI\live\event_processor.py:836: """Start independent heartbeat thread. Runs every 30s regardless of feed/tick state."""
+C:\FluxQuantumAI\live\event_processor.py:837: def _heartbeat_loop():
+C:\FluxQuantumAI\live\event_processor.py:838: log.error("HEARTBEAT_LOOP_ENTERED pid=%d", os.getpid())
+C:\FluxQuantumAI\live\event_processor.py:839: print(f"[HEARTBEAT] Loop entered pid={os.getpid()}", flush=True)
+C:\FluxQuantumAI\live\event_processor.py:842: self._write_service_state()
+C:\FluxQuantumAI\live\event_processor.py:843: log.error("SERVICE_STATE_WRITE_OK path=%s", SERVICE_STATE_PATH)
+C:\FluxQuantumAI\live\event_processor.py:845: log.error("SERVICE_STATE_WRITE_FAIL: %s", _hbe)
+C:\FluxQuantumAI\live\event_processor.py:852: t = threading.Thread(target=_heartbeat_loop, name="heartbeat", daemon=True)
+C:\FluxQuantumAI\live\event_processor.py:854: log.error("HEARTBEAT_THREAD_STARTED pid=%d", os.getpid())
+C:\FluxQuantumAI\live\event_processor.py:855: print(f"[HEARTBEAT] Thread started pid={os.getpid()}", flush=True)
+C:\FluxQuantumAI\live\event_processor.py:1044: self._write_decision(payload)
+C:\FluxQuantumAI\live\event_processor.py:1291: # Reuses module-level uuid, json, DECISION_LIVE_PATH, DECISION_LOG_PATH.
+C:\FluxQuantumAI\live\event_processor.py:1333: DECISION_LIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
+C:\FluxQuantumAI\live\event_processor.py:1334: _tmp = DECISION_LIVE_PATH.with_suffix(".tmp")
+C:\FluxQuantumAI\live\event_processor.py:1337: _tmp.replace(DECISION_LIVE_PATH)
+C:\FluxQuantumAI\live\event_processor.py:1338: with open(DECISION_LOG_PATH, "a", encoding="utf-8") as f:
+C:\FluxQuantumAI\live\event_processor.py:2234: # Single source of truth is decision_live.json / decision_log.jsonl, not these vars.
+C:\FluxQuantumAI\live\event_processor.py:2260: if SERVICE_STATE_PATH.exists():
+C:\FluxQuantumAI\live\event_processor.py:2261: _svc = json.loads(SERVICE_STATE_PATH.read_text(encoding="utf-8"))
+C:\FluxQuantumAI\live\event_processor.py:2270: log.debug("service_state stale check failed: %s", _svc_e)
+C:\FluxQuantumAI\live\event_processor.py:2393: print(f"[{ts}] M30_BIAS_BLOCK: bias=bullish(confirmed) -- SHORT rejected (contra-M30)")
+C:\FluxQuantumAI\live\event_processor.py:2394: log.info("M30_BIAS_BLOCK: confirmed bullish M30 bias rejects SHORT at %.2f (src=%s)", price, source)
+C:\FluxQuantumAI\live\event_processor.py:2399: print(f"[{ts}] M30_BIAS_BLOCK: bias=bearish(confirmed) -- LONG rejected (contra-M30)")
+C:\FluxQuantumAI\live\event_processor.py:2400: log.info("M30_BIAS_BLOCK: confirmed bearish M30 bias rejects LONG at %.2f (src=%s)", price, source)
+C:\FluxQuantumAI\live\event_processor.py:2409: # M30_BIAS_BLOCK (PONTO 1) already filters contra-trend direction.
+C:\FluxQuantumAI\live\event_processor.py:2573: # decision_log entry AND telegram GO notification carry the levels.
+C:\FluxQuantumAI\live\event_processor.py:2620: self._write_decision(_decision_dict)
+C:\FluxQuantumAI\live\event_processor.py:2777: self._write_decision(_decision_dict)
+C:\FluxQuantumAI\live\event_processor.py:2842: _decision_dict["decision"]["action"] = "EXEC_FAILED"
+C:\FluxQuantumAI\live\event_processor.py:2848: self._write_decision(_decision_dict)
+C:\FluxQuantumAI\live\event_processor.py:2849: log.error("EXEC_FAILED: GO %s score=%d but no broker executed", direction, sc)
+C:\FluxQuantumAI\live\event_processor.py:2850: print(f"[{ts}] EXEC_FAILED: GO {direction} — NO BROKER CONNECTED")
+C:\FluxQuantumAI\live\event_processor.py:2962: "DISPLACEMENT_DIVERGE: dir=%s CURRENT=%s OPT_A=%s OPT_B=%s | "
+C:\FluxQuantumAI\live\event_processor.py:4399: print(f"[{ts}] FEED_DEAD -- gate suspended (check Quantower L2 stream port 8000)")
+C:\FluxQuantumAI\live\event_processor.py:4502: self._start_heartbeat_thread()
+C:\FluxQuantumAI\live\feed_health.py:35: STALE_DEAD_SEC   = 300    # FEED_DEAD if no new data for 5 min
+C:\FluxQuantumAI\live\feed_health.py:37: MAX_STALE_COUNTS = 3      # 3 consecutive STALE checks -> FEED_DEAD + halt gate
+C:\FluxQuantumAI\live\feed_health.py:68: FEED_DEAD -- file not updated for > STALE_DEAD_SEC (3x consecutive)
+C:\FluxQuantumAI\live\feed_health.py:70: On FEED_DEAD: logs CRITICAL + sets self.gate_enabled = False.
+C:\FluxQuantumAI\live\feed_health.py:77: self.gate_enabled = True     # set False when FEED_DEAD
+C:\FluxQuantumAI\live\feed_health.py:85: Returns {"status": "OK"|"STALE"|"FEED_DEAD"|"NO_FILE", "age_sec": float}.
+C:\FluxQuantumAI\live\feed_health.py:99: status = "FEED_DEAD"
+C:\FluxQuantumAI\live\feed_health.py:126: "FEED_DEAD: microstructure file not updated for %.0fs "
+C:\FluxQuantumAI\live\feed_health.py:135: elif status == "FEED_DEAD":
+C:\FluxQuantumAI\live\feed_health.py:139: "FEED_DEAD: microstructure not updated for %.0fs. "
+C:\FluxQuantumAI\live\hedge_manager.py:65: DECISION_LIVE_PATH = Path("C:/FluxQuantumAI/logs/decision_live.json")
+C:\FluxQuantumAI\live\hedge_manager.py:66: DECISION_LOG_PATH  = Path("C:/FluxQuantumAI/logs/decision_log.jsonl")
+C:\FluxQuantumAI\live\hedge_manager.py:490: # Atomic write decision_live.json
+C:\FluxQuantumAI\live\hedge_manager.py:491: DECISION_LIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
+C:\FluxQuantumAI\live\hedge_manager.py:492: _tmp = DECISION_LIVE_PATH.with_suffix(".tmp")
+C:\FluxQuantumAI\live\hedge_manager.py:495: _tmp.replace(DECISION_LIVE_PATH)
+C:\FluxQuantumAI\live\hedge_manager.py:496: with open(DECISION_LOG_PATH, "a", encoding="utf-8") as f:
+C:\FluxQuantumAI\live\position_monitor.py:64: DECISION_LIVE_PATH = Path("C:/FluxQuantumAI/logs/decision_live.json")
+C:\FluxQuantumAI\live\position_monitor.py:65: DECISION_LOG_PATH  = Path("C:/FluxQuantumAI/logs/decision_log.jsonl")
+C:\FluxQuantumAI\live\position_monitor.py:85: SERVICE_STATE_PATH   = Path("C:/FluxQuantumAI/logs/service_state.json")
+C:\FluxQuantumAI\live\position_monitor.py:421: self._last_decision_log: dict[int, float] = {}
+C:\FluxQuantumAI\live\position_monitor.py:1363: 1. Defense mode active (ENTRY_BLOCK or DEFENSIVE_EXIT from service_state.json)
+C:\FluxQuantumAI\live\position_monitor.py:1389: if SERVICE_STATE_PATH.exists():
+C:\FluxQuantumAI\live\position_monitor.py:1390: with open(SERVICE_STATE_PATH, "r") as f:
+C:\FluxQuantumAI\live\position_monitor.py:1482: # (see _publish_canonical_pm_event + tg.notify_decision).
+C:\FluxQuantumAI\live\position_monitor.py:1817: _DECISION_LOG_INTERVAL = 30.0   # seconds between decision snapshots per ticket
+C:\FluxQuantumAI\live\position_monitor.py:1841: last   = self._last_decision_log.get(ticket, 0.0)
+C:\FluxQuantumAI\live\position_monitor.py:1842: if now_mono - last < self._DECISION_LOG_INTERVAL:
+C:\FluxQuantumAI\live\position_monitor.py:1844: self._last_decision_log[ticket] = now_mono
+C:\FluxQuantumAI\live\position_monitor.py:2002: self._publish_canonical_pm_event(payload)
+C:\FluxQuantumAI\live\position_monitor.py:2004: def _publish_canonical_pm_event(self, event_payload: dict) -> None:
+C:\FluxQuantumAI\live\position_monitor.py:2047: DECISION_LIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
+C:\FluxQuantumAI\live\position_monitor.py:2049: tmp = DECISION_LIVE_PATH.with_suffix(".tmp")
+C:\FluxQuantumAI\live\position_monitor.py:2052: tmp.replace(DECISION_LIVE_PATH)
+C:\FluxQuantumAI\live\position_monitor.py:2053: with open(DECISION_LOG_PATH, "a", encoding="utf-8") as f:
+C:\FluxQuantumAI\live\position_monitor.py:2238: # Emit canonical PM event — goes through _publish_canonical_pm_event
+C:\FluxQuantumAI\live\telegram_notifier.py:60: # Reads decision_live.json. Zero calculation.
+C:\FluxQuantumAI\live\telegram_notifier.py:70: Read decision_live.json and send ENTRY or BLOCK message.
+C:\FluxQuantumAI\live\telegram_notifier.py:71: Source: decision_live.json only. Zero calculation.
+C:\FluxQuantumAI\live\telegram_notifier.py:76: dl = _read_json(_DECISION_LIVE_PATH)
+C:\FluxQuantumAI\live\telegram_notifier.py:104: # Context comes from canonical decision payload first; fallback to service_state
+C:\FluxQuantumAI\live\telegram_notifier.py:106: ss = _read_json(_SERVICE_STATE_PATH) or {}
+C:\FluxQuantumAI\live\telegram_notifier.py:238: Notify Telegram of EXECUTION event (EXECUTED or EXEC_FAILED).
+C:\FluxQuantumAI\live\telegram_notifier.py:243: dl = _read_json(_DECISION_LIVE_PATH)
+C:\FluxQuantumAI\live\telegram_notifier.py:278: elif action == "EXEC_FAILED":
+C:\FluxQuantumAI\live\telegram_notifier.py:295: """Legacy — reads decision_live.json instead of using parameters."""
+C:\FluxQuantumAI\live\telegram_notifier.py:300: """Legacy — reads decision_live.json instead of using parameters."""
+C:\FluxQuantumAI\live\telegram_notifier.py:408: def notify_feed_dead():
+C:\FluxQuantumAI\live\telegram_notifier.py:523: ss = _read_json(_SERVICE_STATE_PATH) or {}
+C:\FluxQuantumAI\live\telegram_notifier.py:528: dl = _read_json(_DECISION_LIVE_PATH)
+C:\FluxQuantumAI\live\telegram_notifier.py:558: # Source: service_state.json + trades data passed by caller
+C:\FluxQuantumAI\live\telegram_notifier.py:573: """End-of-day report. Context from service_state.json."""
+C:\FluxQuantumAI\live\telegram_notifier.py:578: ss = _read_json(_SERVICE_STATE_PATH) or {}
+C:\FluxQuantumAI\live\telegram_notifier.py:635: _SERVICE_STATE_PATH  = "C:/FluxQuantumAI/logs/service_state.json"
+C:\FluxQuantumAI\live\telegram_notifier.py:636: _DECISION_LIVE_PATH  = "C:/FluxQuantumAI/logs/decision_live.json"
+C:\FluxQuantumAI\live\telegram_notifier.py:692: Health check — reads service_state.json + decision_live.json.
+C:\FluxQuantumAI\live\telegram_notifier.py:701: ss = _read_json(_SERVICE_STATE_PATH)
+C:\FluxQuantumAI\live\telegram_notifier.py:705: dl = _read_json(_DECISION_LIVE_PATH)
+C:\FluxQuantumAI\live\telegram_notifier.py:731: # Gates from decision_live.json

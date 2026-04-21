@@ -1,0 +1,65 @@
+========================================================================
+RELATORIO DE CONFLUENCIA — AnomalyForge vs OrderStorm
+Gerado: 2026-04-11 18:36:18 UTC
+========================================================================
+
+--- PARTE 1: ALIGNMENT TEST (Stress Etico) ---
+
+Cenario                                    AnomalyScore   ForgeLevel    Iceberg   Result Contracts FinalMult
+------------------------------------------------------------------------------------------
+A: Normal + Iceberg Aligned                      0.1000        CLEAR    aligned     PASS      2.60    0.6500
+B: AnomalyForge WARNING + Iceberg Aligne         0.9600      WARNING    aligned     PASS      1.95    0.4875
+C: AnomalyForge CRITICAL + Iceberg Align         0.9920     CRITICAL    aligned     PASS      1.43    0.3575
+D: AnomalyForge SEVERE + Iceberg Strongl         0.9970       SEVERE    aligned     PASS      1.00    0.2500
+E: AnomalyForge HARD_VETO + Iceberg Stro         0.9995    HARD_VETO        N/A     PASS      0.00    0.0000
+F: AnomalyForge HARD_VETO + Iceberg OPPO         0.9995    HARD_VETO        N/A     PASS      0.00    0.0000
+G: Normal Market, Iceberg Opposed (Soft          0.1000        CLEAR    opposed     PASS      1.50    0.3750
+H: Zero-Contract Rule                            0.9700      WARNING    opposed     PASS      1.12    0.2812
+
+Alignmnent Test: 8/8 passed
+
+--- PARTE 2: ENSEMBLE TEST (Full Machine Replay) ---
+
+Window:  2025-12-02T14:30:00 -> 2025-12-02T18:30:00 UTC
+Ticks processados:  6447
+Replay em:          414.50s
+Parse errors:       0
+
+  SINAIS E VETOS:
+    Sinais emitidos:         0
+    Bloqueados Gate 1:       6388
+    Bloqueados Gate 3:       0
+    Zero-contract trades:    0
+
+  DISTRIBUICAO FORGE LEVELS:
+    CLEAR       :     0  (0.0%)
+    WARNING     :     0  (0.0%)
+    CRITICAL    :     0  (0.0%)
+    SEVERE      :     0  (0.0%)
+    HARD_VETO   :  6388  (99.1%)
+    STUB        :    59  (0.9%)
+
+  DISTRIBUICAO ICEBERG CONFLUENCE:
+    aligned   :     0  (0.0%)
+    neutral   :     0  (0.0%)
+    opposed   :     0  (0.0%)
+    stub      :  6447  (100.0%)
+
+  CONFLUENCIA FORGE vs ICEBERG:
+    AGREE    (Forge CLEAR + Iceberg ALIGNED): 0
+    CONFLICT (Forge ANOMALOUS + Iceberg ALIGNED): 0
+    NEUTRAL: 6447
+
+  MOMENTOS DE CONFLUENCIA (primeiros 20):
+
+--- METRICA DE LATENCIA SISTEMICA E2E ---
+
+  (dxFeed -> G1 -> G2 -> G3 -> G4 -> G5 -> MasterVerdict)
+    Min:     0.150 ms
+    P50:    55.440 ms
+    P95:   171.674 ms
+    P99:   285.494 ms
+    Max:  1476.550 ms
+    Mean:   63.991 ms
+
+========================================================================

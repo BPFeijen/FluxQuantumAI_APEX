@@ -1,0 +1,8 @@
+{
+  "stage1": {
+    "best_epoch": 3,
+    "best_val_loss": 0.04064197235859253,
+    "elapsed_min": 117.1
+  },
+  "total_elapsed_min": 117.2
+}

@@ -1,0 +1,12 @@
+# ml_iceberg_v2 — SageMaker container requirements
+# Base image: pytorch-training:2.1.0-gpu-py310-cu118-ubuntu20.04-sagemaker
+# (already includes: torch, numpy, scipy, scikit-learn, pandas, boto3, s3fs)
+
+# Additional dependencies
+pyarrow>=14.0.0          # parquet read/write (pd.read_parquet / to_parquet)
+fastparquet>=2023.10.0   # alternative parquet backend
+zstandard>=0.21.0        # Databento .zst decompression (extract_features)
+
+# Pinned for reproducibility
+pandas>=2.0.0,<3.0.0
+numpy>=1.24.0,<2.0.0

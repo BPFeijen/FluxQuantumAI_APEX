@@ -1,0 +1,879 @@
+{
+  "seller_exh_lt_-1050": {
+    "hypothesis_dir": "LONG",
+    "predicate": "rolling_delta_4h < -1050",
+    "total_events": 20677,
+    "by_period": {
+      "sprint8_training_2025_Jul_Nov": {
+        "N_period": 19538,
+        "by_regime": {
+          "RANGE": {
+            "N": 484,
+            "30m": {
+              "N_with_fwd": 484,
+              "mean_pts": 0.793,
+              "ci95_lo": 0.619,
+              "ci95_hi": 0.977,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.6281,
+              "cohens_d_vs_baseline": 0.2425
+            },
+            "60m": {
+              "N_with_fwd": 484,
+              "mean_pts": 0.992,
+              "ci95_lo": 0.764,
+              "ci95_hi": 1.237,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.6136,
+              "cohens_d_vs_baseline": 0.2247
+            },
+            "4h": {
+              "N_with_fwd": 484,
+              "mean_pts": 5.849,
+              "ci95_lo": 5.233,
+              "ci95_hi": 6.422,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.7913,
+              "cohens_d_vs_baseline": 0.7569
+            },
+            "24h": {
+              "N_with_fwd": 484,
+              "mean_pts": 0.442,
+              "ci95_lo": -0.939,
+              "ci95_hi": 1.904,
+              "ci_crosses_zero": true,
+              "hypothesis_win_rate": 0.5888,
+              "cohens_d_vs_baseline": -0.0609
+            }
+          },
+          "TREND_UP": {
+            "N": 13283,
+            "30m": {
+              "N_with_fwd": 13283,
+              "mean_pts": 0.335,
+              "ci95_lo": 0.163,
+              "ci95_hi": 0.481,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5267,
+              "cohens_d_vs_baseline": 0.0066
+            },
+            "60m": {
+              "N_with_fwd": 13283,
+              "mean_pts": 0.806,
+              "ci95_lo": 0.593,
+              "ci95_hi": 0.997,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5525,
+              "cohens_d_vs_baseline": 0.0235
+            },
+            "4h": {
+              "N_with_fwd": 13283,
+              "mean_pts": 3.42,
+              "ci95_lo": 3.056,
+              "ci95_hi": 3.781,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.6024,
+              "cohens_d_vs_baseline": 0.0621
+            },
+            "24h": {
+              "N_with_fwd": 13283,
+              "mean_pts": 4.606,
+              "ci95_lo": 3.503,
+              "ci95_hi": 5.69,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5924,
+              "cohens_d_vs_baseline": -0.103
+            }
+          },
+          "TREND_DN": {
+            "N": 0,
+            "note": "insufficient events (<5)"
+          },
+          "TRANSITIONAL": {
+            "N": 5771,
+            "30m": {
+              "N_with_fwd": 5771,
+              "mean_pts": 0.073,
+              "ci95_lo": -0.071,
+              "ci95_hi": 0.207,
+              "ci_crosses_zero": true,
+              "hypothesis_win_rate": 0.4582,
+              "cohens_d_vs_baseline": 0.0132
+            },
+            "60m": {
+              "N_with_fwd": 5771,
+              "mean_pts": -0.016,
+              "ci95_lo": -0.199,
+              "ci95_hi": 0.175,
+              "ci_crosses_zero": true,
+              "hypothesis_win_rate": 0.4623,
+              "cohens_d_vs_baseline": -0.0048
+            },
+            "4h": {
+              "N_with_fwd": 5771,
+              "mean_pts": 0.238,
+              "ci95_lo": -0.138,
+              "ci95_hi": 0.621,
+              "ci_crosses_zero": true,
+              "hypothesis_win_rate": 0.4264,
+              "cohens_d_vs_baseline": -0.0066
+            },
+            "24h": {
+              "N_with_fwd": 5771,
+              "mean_pts": -0.703,
+              "ci95_lo": -1.909,
+              "ci95_hi": 0.646,
+              "ci_crosses_zero": true,
+              "hypothesis_win_rate": 0.4646,
+              "cohens_d_vs_baseline": -0.176
+            }
+          }
+        }
+      },
+      "post_deploy_2025_Dec_2026_Mar": {
+        "N_period": 1139,
+        "by_regime": {
+          "RANGE": {
+            "N": 0,
+            "note": "insufficient events (<5)"
+          },
+          "TREND_UP": {
+            "N": 804,
+            "30m": {
+              "N_with_fwd": 804,
+              "mean_pts": 1.048,
+              "ci95_lo": 0.566,
+              "ci95_hi": 1.54,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5746,
+              "cohens_d_vs_baseline": 0.0597
+            },
+            "60m": {
+              "N_with_fwd": 804,
+              "mean_pts": 2.51,
+              "ci95_lo": 1.81,
+              "ci95_hi": 3.184,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5833,
+              "cohens_d_vs_baseline": 0.11
+            },
+            "4h": {
+              "N_with_fwd": 804,
+              "mean_pts": 6.127,
+              "ci95_lo": 4.951,
+              "ci95_hi": 7.244,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.6082,
+              "cohens_d_vs_baseline": 0.1118
+            },
+            "24h": {
+              "N_with_fwd": 804,
+              "mean_pts": -33.221,
+              "ci95_lo": -40.056,
+              "ci95_hi": -27.295,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.6741,
+              "cohens_d_vs_baseline": -0.5481
+            }
+          },
+          "TREND_DN": {
+            "N": 0,
+            "note": "insufficient events (<5)"
+          },
+          "TRANSITIONAL": {
+            "N": 335,
+            "30m": {
+              "N_with_fwd": 335,
+              "mean_pts": 1.848,
+              "ci95_lo": 0.85,
+              "ci95_hi": 2.792,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.6925,
+              "cohens_d_vs_baseline": 0.126
+            },
+            "60m": {
+              "N_with_fwd": 335,
+              "mean_pts": 2.14,
+              "ci95_lo": 0.868,
+              "ci95_hi": 3.386,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.6836,
+              "cohens_d_vs_baseline": 0.1169
+            },
+            "4h": {
+              "N_with_fwd": 335,
+              "mean_pts": 8.467,
+              "ci95_lo": 6.401,
+              "ci95_hi": 10.59,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5552,
+              "cohens_d_vs_baseline": 0.2469
+            },
+            "24h": {
+              "N_with_fwd": 335,
+              "mean_pts": -35.289,
+              "ci95_lo": -41.972,
+              "ci95_hi": -28.282,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.4209,
+              "cohens_d_vs_baseline": -0.2914
+            }
+          }
+        }
+      },
+      "recent_2026_Apr": {
+        "note": "no events in period",
+        "N": 0
+      }
+    }
+  },
+  "buyer_exh_gt_+3000": {
+    "hypothesis_dir": "SHORT",
+    "predicate": "rolling_delta_4h > 3000",
+    "total_events": 1583,
+    "by_period": {
+      "sprint8_training_2025_Jul_Nov": {
+        "N_period": 1500,
+        "by_regime": {
+          "RANGE": {
+            "N": 0,
+            "note": "insufficient events (<5)"
+          },
+          "TREND_UP": {
+            "N": 901,
+            "30m": {
+              "N_with_fwd": 901,
+              "mean_pts": -2.423,
+              "ci95_lo": -3.247,
+              "ci95_hi": -1.611,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5216,
+              "cohens_d_vs_baseline": -0.3631
+            },
+            "60m": {
+              "N_with_fwd": 901,
+              "mean_pts": -4.624,
+              "ci95_lo": -5.639,
+              "ci95_hi": -3.633,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5627,
+              "cohens_d_vs_baseline": -0.4968
+            },
+            "4h": {
+              "N_with_fwd": 901,
+              "mean_pts": -5.098,
+              "ci95_lo": -6.719,
+              "ci95_hi": -3.418,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.6626,
+              "cohens_d_vs_baseline": -0.3591
+            },
+            "24h": {
+              "N_with_fwd": 901,
+              "mean_pts": 13.754,
+              "ci95_lo": 10.128,
+              "ci95_hi": 17.32,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.343,
+              "cohens_d_vs_baseline": 0.0662
+            }
+          },
+          "TREND_DN": {
+            "N": 0,
+            "note": "insufficient events (<5)"
+          },
+          "TRANSITIONAL": {
+            "N": 599,
+            "30m": {
+              "N_with_fwd": 599,
+              "mean_pts": -1.455,
+              "ci95_lo": -1.878,
+              "ci95_hi": -1.051,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.571,
+              "cohens_d_vs_baseline": -0.2451
+            },
+            "60m": {
+              "N_with_fwd": 599,
+              "mean_pts": -3.232,
+              "ci95_lo": -3.95,
+              "ci95_hi": -2.608,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.6561,
+              "cohens_d_vs_baseline": -0.3796
+            },
+            "4h": {
+              "N_with_fwd": 599,
+              "mean_pts": -14.114,
+              "ci95_lo": -15.336,
+              "ci95_hi": -12.898,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.8664,
+              "cohens_d_vs_baseline": -0.7987
+            },
+            "24h": {
+              "N_with_fwd": 599,
+              "mean_pts": 13.671,
+              "ci95_lo": 11.36,
+              "ci95_hi": 15.662,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.2888,
+              "cohens_d_vs_baseline": 0.158
+            }
+          }
+        }
+      },
+      "post_deploy_2025_Dec_2026_Mar": {
+        "N_period": 83,
+        "by_regime": {
+          "RANGE": {
+            "N": 0,
+            "note": "insufficient events (<5)"
+          },
+          "TREND_UP": {
+            "N": 60,
+            "30m": {
+              "N_with_fwd": 60,
+              "mean_pts": 0.173,
+              "ci95_lo": -0.243,
+              "ci95_hi": 0.645,
+              "ci_crosses_zero": true,
+              "hypothesis_win_rate": 0.4167,
+              "cohens_d_vs_baseline": -0.0096
+            },
+            "60m": {
+              "N_with_fwd": 60,
+              "mean_pts": 2.153,
+              "ci95_lo": 1.408,
+              "ci95_hi": 2.882,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.2167,
+              "cohens_d_vs_baseline": 0.0889
+            },
+            "4h": {
+              "N_with_fwd": 60,
+              "mean_pts": -24.527,
+              "ci95_lo": -26.541,
+              "ci95_hi": -22.358,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 1.0,
+              "cohens_d_vs_baseline": -0.7899
+            },
+            "24h": {
+              "N_with_fwd": 60,
+              "mean_pts": 0.215,
+              "ci95_lo": -0.165,
+              "ci95_hi": 0.573,
+              "ci_crosses_zero": true,
+              "hypothesis_win_rate": 0.4333,
+              "cohens_d_vs_baseline": -0.1163
+            }
+          },
+          "TREND_DN": {
+            "N": 0,
+            "note": "insufficient events (<5)"
+          },
+          "TRANSITIONAL": {
+            "N": 23,
+            "30m": {
+              "N_with_fwd": 23,
+              "mean_pts": 1.687,
+              "ci95_lo": 0.609,
+              "ci95_hi": 2.744,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.3043,
+              "cohens_d_vs_baseline": 0.1161
+            },
+            "60m": {
+              "N_with_fwd": 23,
+              "mean_pts": 3.0,
+              "ci95_lo": 1.996,
+              "ci95_hi": 4.148,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.087,
+              "cohens_d_vs_baseline": 0.1514
+            },
+            "4h": {
+              "N_with_fwd": 23,
+              "mean_pts": -43.935,
+              "ci95_lo": -46.257,
+              "ci95_hi": -41.961,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 1.0,
+              "cohens_d_vs_baseline": -0.8416
+            },
+            "24h": {
+              "N_with_fwd": 23,
+              "mean_pts": 5.8,
+              "ci95_lo": 5.23,
+              "ci95_hi": 6.291,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.0,
+              "cohens_d_vs_baseline": 0.0563
+            }
+          }
+        }
+      },
+      "recent_2026_Apr": {
+        "note": "no events in period",
+        "N": 0
+      }
+    }
+  },
+  "seller_exh_lt_-800_original": {
+    "hypothesis_dir": "LONG",
+    "predicate": "rolling_delta_4h < -800",
+    "total_events": 30110,
+    "by_period": {
+      "sprint8_training_2025_Jul_Nov": {
+        "N_period": 28761,
+        "by_regime": {
+          "RANGE": {
+            "N": 854,
+            "30m": {
+              "N_with_fwd": 854,
+              "mean_pts": 0.418,
+              "ci95_lo": 0.258,
+              "ci95_hi": 0.58,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5504,
+              "cohens_d_vs_baseline": 0.1255
+            },
+            "60m": {
+              "N_with_fwd": 854,
+              "mean_pts": 0.941,
+              "ci95_lo": 0.73,
+              "ci95_hi": 1.172,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5785,
+              "cohens_d_vs_baseline": 0.2145
+            },
+            "4h": {
+              "N_with_fwd": 854,
+              "mean_pts": 4.092,
+              "ci95_lo": 3.567,
+              "ci95_hi": 4.602,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.6944,
+              "cohens_d_vs_baseline": 0.555
+            },
+            "24h": {
+              "N_with_fwd": 854,
+              "mean_pts": -0.079,
+              "ci95_lo": -1.178,
+              "ci95_hi": 0.96,
+              "ci_crosses_zero": true,
+              "hypothesis_win_rate": 0.6007,
+              "cohens_d_vs_baseline": -0.0921
+            }
+          },
+          "TREND_UP": {
+            "N": 19388,
+            "30m": {
+              "N_with_fwd": 19388,
+              "mean_pts": 0.44,
+              "ci95_lo": 0.321,
+              "ci95_hi": 0.558,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5322,
+              "cohens_d_vs_baseline": 0.0205
+            },
+            "60m": {
+              "N_with_fwd": 19388,
+              "mean_pts": 0.89,
+              "ci95_lo": 0.724,
+              "ci95_hi": 1.053,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5562,
+              "cohens_d_vs_baseline": 0.0314
+            },
+            "4h": {
+              "N_with_fwd": 19388,
+              "mean_pts": 2.668,
+              "ci95_lo": 2.378,
+              "ci95_hi": 2.977,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5853,
+              "cohens_d_vs_baseline": 0.0249
+            },
+            "24h": {
+              "N_with_fwd": 19388,
+              "mean_pts": 3.847,
+              "ci95_lo": 2.959,
+              "ci95_hi": 4.864,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5838,
+              "cohens_d_vs_baseline": -0.1152
+            }
+          },
+          "TREND_DN": {
+            "N": 0,
+            "note": "insufficient events (<5)"
+          },
+          "TRANSITIONAL": {
+            "N": 8519,
+            "30m": {
+              "N_with_fwd": 8519,
+              "mean_pts": 0.22,
+              "ci95_lo": 0.108,
+              "ci95_hi": 0.324,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.485,
+              "cohens_d_vs_baseline": 0.0385
+            },
+            "60m": {
+              "N_with_fwd": 8519,
+              "mean_pts": 0.383,
+              "ci95_lo": 0.23,
+              "ci95_hi": 0.54,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.4886,
+              "cohens_d_vs_baseline": 0.0426
+            },
+            "4h": {
+              "N_with_fwd": 8519,
+              "mean_pts": 1.027,
+              "ci95_lo": 0.719,
+              "ci95_hi": 1.344,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.4511,
+              "cohens_d_vs_baseline": 0.0382
+            },
+            "24h": {
+              "N_with_fwd": 8519,
+              "mean_pts": 0.312,
+              "ci95_lo": -0.725,
+              "ci95_hi": 1.273,
+              "ci_crosses_zero": true,
+              "hypothesis_win_rate": 0.4726,
+              "cohens_d_vs_baseline": -0.1512
+            }
+          }
+        }
+      },
+      "post_deploy_2025_Dec_2026_Mar": {
+        "N_period": 1349,
+        "by_regime": {
+          "RANGE": {
+            "N": 0,
+            "note": "insufficient events (<5)"
+          },
+          "TREND_UP": {
+            "N": 938,
+            "30m": {
+              "N_with_fwd": 938,
+              "mean_pts": 1.014,
+              "ci95_lo": 0.557,
+              "ci95_hi": 1.488,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.581,
+              "cohens_d_vs_baseline": 0.0571
+            },
+            "60m": {
+              "N_with_fwd": 938,
+              "mean_pts": 2.392,
+              "ci95_lo": 1.721,
+              "ci95_hi": 3.042,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5959,
+              "cohens_d_vs_baseline": 0.1031
+            },
+            "4h": {
+              "N_with_fwd": 938,
+              "mean_pts": 5.017,
+              "ci95_lo": 4.033,
+              "ci95_hi": 6.116,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5832,
+              "cohens_d_vs_baseline": 0.0791
+            },
+            "24h": {
+              "N_with_fwd": 938,
+              "mean_pts": -28.054,
+              "ci95_lo": -33.391,
+              "ci95_hi": -22.3,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.6716,
+              "cohens_d_vs_baseline": -0.4816
+            }
+          },
+          "TREND_DN": {
+            "N": 0,
+            "note": "insufficient events (<5)"
+          },
+          "TRANSITIONAL": {
+            "N": 411,
+            "30m": {
+              "N_with_fwd": 411,
+              "mean_pts": 1.974,
+              "ci95_lo": 1.182,
+              "ci95_hi": 2.722,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.7105,
+              "cohens_d_vs_baseline": 0.1336
+            },
+            "60m": {
+              "N_with_fwd": 411,
+              "mean_pts": 2.757,
+              "ci95_lo": 1.749,
+              "ci95_hi": 3.731,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.7421,
+              "cohens_d_vs_baseline": 0.1423
+            },
+            "4h": {
+              "N_with_fwd": 411,
+              "mean_pts": 14.198,
+              "ci95_lo": 12.074,
+              "ci95_hi": 16.394,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.6375,
+              "cohens_d_vs_baseline": 0.3666
+            },
+            "24h": {
+              "N_with_fwd": 411,
+              "mean_pts": -18.992,
+              "ci95_lo": -25.419,
+              "ci95_hi": -12.652,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5036,
+              "cohens_d_vs_baseline": -0.1535
+            }
+          }
+        }
+      },
+      "recent_2026_Apr": {
+        "note": "no events in period",
+        "N": 0
+      }
+    }
+  },
+  "buyer_exh_gt_+800_original": {
+    "hypothesis_dir": "SHORT",
+    "predicate": "rolling_delta_4h > 800",
+    "total_events": 21501,
+    "by_period": {
+      "sprint8_training_2025_Jul_Nov": {
+        "N_period": 20946,
+        "by_regime": {
+          "RANGE": {
+            "N": 35,
+            "30m": {
+              "N_with_fwd": 35,
+              "mean_pts": 0.409,
+              "ci95_lo": -0.414,
+              "ci95_hi": 1.183,
+              "ci_crosses_zero": true,
+              "hypothesis_win_rate": 0.4571,
+              "cohens_d_vs_baseline": 0.1176
+            },
+            "60m": {
+              "N_with_fwd": 35,
+              "mean_pts": -2.82,
+              "ci95_lo": -3.64,
+              "ci95_hi": -1.945,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.7429,
+              "cohens_d_vs_baseline": -0.6115
+            },
+            "4h": {
+              "N_with_fwd": 35,
+              "mean_pts": -5.166,
+              "ci95_lo": -6.494,
+              "ci95_hi": -3.657,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.8286,
+              "cohens_d_vs_baseline": -0.4907
+            },
+            "24h": {
+              "N_with_fwd": 35,
+              "mean_pts": 2.289,
+              "ci95_lo": -0.841,
+              "ci95_hi": 5.249,
+              "ci_crosses_zero": true,
+              "hypothesis_win_rate": 0.4571,
+              "cohens_d_vs_baseline": 0.0498
+            }
+          },
+          "TREND_UP": {
+            "N": 15622,
+            "30m": {
+              "N_with_fwd": 15622,
+              "mean_pts": -0.182,
+              "ci95_lo": -0.302,
+              "ci95_hi": -0.06,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.4793,
+              "cohens_d_vs_baseline": -0.0624
+            },
+            "60m": {
+              "N_with_fwd": 15622,
+              "mean_pts": -0.623,
+              "ci95_lo": -0.802,
+              "ci95_hi": -0.445,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.4922,
+              "cohens_d_vs_baseline": -0.1122
+            },
+            "4h": {
+              "N_with_fwd": 15622,
+              "mean_pts": -1.185,
+              "ci95_lo": -1.553,
+              "ci95_hi": -0.842,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.4926,
+              "cohens_d_vs_baseline": -0.1629
+            },
+            "24h": {
+              "N_with_fwd": 15622,
+              "mean_pts": 3.788,
+              "ci95_lo": 3.03,
+              "ci95_hi": 4.565,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.4578,
+              "cohens_d_vs_baseline": -0.1221
+            }
+          },
+          "TREND_DN": {
+            "N": 0,
+            "note": "insufficient events (<5)"
+          },
+          "TRANSITIONAL": {
+            "N": 5289,
+            "30m": {
+              "N_with_fwd": 5289,
+              "mean_pts": -0.051,
+              "ci95_lo": -0.227,
+              "ci95_hi": 0.127,
+              "ci_crosses_zero": true,
+              "hypothesis_win_rate": 0.485,
+              "cohens_d_vs_baseline": -0.0078
+            },
+            "60m": {
+              "N_with_fwd": 5289,
+              "mean_pts": -0.173,
+              "ci95_lo": -0.435,
+              "ci95_hi": 0.112,
+              "ci_crosses_zero": true,
+              "hypothesis_win_rate": 0.4697,
+              "cohens_d_vs_baseline": -0.0227
+            },
+            "4h": {
+              "N_with_fwd": 5289,
+              "mean_pts": -1.271,
+              "ci95_lo": -1.855,
+              "ci95_hi": -0.679,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.512,
+              "cohens_d_vs_baseline": -0.0873
+            },
+            "24h": {
+              "N_with_fwd": 5289,
+              "mean_pts": 6.868,
+              "ci95_lo": 5.47,
+              "ci95_hi": 8.212,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.3908,
+              "cohens_d_vs_baseline": -0.0013
+            }
+          }
+        }
+      },
+      "post_deploy_2025_Dec_2026_Mar": {
+        "N_period": 555,
+        "by_regime": {
+          "RANGE": {
+            "N": 0,
+            "note": "insufficient events (<5)"
+          },
+          "TREND_UP": {
+            "N": 472,
+            "30m": {
+              "N_with_fwd": 472,
+              "mean_pts": -2.414,
+              "ci95_lo": -3.139,
+              "ci95_hi": -1.64,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5572,
+              "cohens_d_vs_baseline": -0.2143
+            },
+            "60m": {
+              "N_with_fwd": 472,
+              "mean_pts": -5.324,
+              "ci95_lo": -6.529,
+              "ci95_hi": -4.088,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5466,
+              "cohens_d_vs_baseline": -0.3449
+            },
+            "4h": {
+              "N_with_fwd": 472,
+              "mean_pts": -6.184,
+              "ci95_lo": -8.218,
+              "ci95_hi": -4.194,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.5784,
+              "cohens_d_vs_baseline": -0.251
+            },
+            "24h": {
+              "N_with_fwd": 472,
+              "mean_pts": -28.68,
+              "ci95_lo": -32.446,
+              "ci95_hi": -24.651,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.7203,
+              "cohens_d_vs_baseline": -0.4917
+            }
+          },
+          "TREND_DN": {
+            "N": 0,
+            "note": "insufficient events (<5)"
+          },
+          "TRANSITIONAL": {
+            "N": 83,
+            "30m": {
+              "N_with_fwd": 83,
+              "mean_pts": -0.865,
+              "ci95_lo": -2.244,
+              "ci95_hi": 0.434,
+              "ci_crosses_zero": true,
+              "hypothesis_win_rate": 0.5783,
+              "cohens_d_vs_baseline": -0.0334
+            },
+            "60m": {
+              "N_with_fwd": 83,
+              "mean_pts": -1.865,
+              "ci95_lo": -3.075,
+              "ci95_hi": -0.615,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.494,
+              "cohens_d_vs_baseline": -0.0464
+            },
+            "4h": {
+              "N_with_fwd": 83,
+              "mean_pts": -27.199,
+              "ci95_lo": -32.059,
+              "ci95_hi": -22.372,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.7229,
+              "cohens_d_vs_baseline": -0.4946
+            },
+            "24h": {
+              "N_with_fwd": 83,
+              "mean_pts": -18.553,
+              "ci95_lo": -26.001,
+              "ci95_hi": -10.839,
+              "ci_crosses_zero": false,
+              "hypothesis_win_rate": 0.494,
+              "cohens_d_vs_baseline": -0.1493
+            }
+          }
+        }
+      },
+      "recent_2026_Apr": {
+        "note": "no events in period",
+        "N": 0
+      }
+    }
+  }
+}

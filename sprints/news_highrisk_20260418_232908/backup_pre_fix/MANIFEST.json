@@ -1,0 +1,8 @@
+{
+    "event_processor.py":  "77DAE71335AF92047ABB515DE4EE71DA",
+    "ats_live_gate.py":  "B42AE7F0BA4B934B88CA78BABD303F7F",
+    "anomaly_scorer.py":  "20BD1EF78965F64F76AAF516AA7C38F0",
+    "news_config.yaml":  "25F98C923F0780CEF1DCB4012AC8CCC2",
+    "grenadier_guardrail.py":  "CB10A338F1D4705E96A3456DF4FCC1B5",
+    "country_relevance_gold.json":  "753BAC940E72C5BFE3DA2991DA309471"
+}

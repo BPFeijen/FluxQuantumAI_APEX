@@ -1,0 +1,74 @@
+{
+  "baseline": {
+    "label": "A) BASELINE (all trades)",
+    "trades": 24,
+    "wins": 10,
+    "losses": 12,
+    "flat": 2,
+    "win_rate": 41.7,
+    "total_pnl_pts": -17.02,
+    "avg_pnl_pts": -0.71,
+    "avg_win_pts": 2.3,
+    "avg_loss_pts": -3.33,
+    "gross_win": 22.98,
+    "gross_loss": 40.0,
+    "profit_factor": 0.575,
+    "shield_count": 1,
+    "shield_rate": 4.2,
+    "exit_reasons": {
+      "REGIME_FLIP": 8,
+      "SL_HIT": 8,
+      "L2_DANGER": 8
+    }
+  },
+  "filtered": {
+    "label": "B) FILTERED (block anomaly >= HIGH)",
+    "trades": 2,
+    "wins": 2,
+    "losses": 0,
+    "flat": 0,
+    "win_rate": 100.0,
+    "total_pnl_pts": 3.7,
+    "avg_pnl_pts": 1.85,
+    "avg_win_pts": 1.85,
+    "avg_loss_pts": 0,
+    "gross_win": 3.7,
+    "gross_loss": 0,
+    "profit_factor": Infinity,
+    "shield_count": 0,
+    "shield_rate": 0.0,
+    "exit_reasons": {
+      "REGIME_FLIP": 1,
+      "L2_DANGER": 1
+    }
+  },
+  "blocked": {
+    "label": "BLOCKED trades (would have been avoided)",
+    "trades": 22,
+    "wins": 8,
+    "losses": 12,
+    "flat": 2,
+    "win_rate": 36.4,
+    "total_pnl_pts": -20.72,
+    "avg_pnl_pts": -0.94,
+    "avg_win_pts": 2.41,
+    "avg_loss_pts": -3.33,
+    "gross_win": 19.28,
+    "gross_loss": 40.0,
+    "profit_factor": 0.482,
+    "shield_count": 1,
+    "shield_rate": 4.5,
+    "exit_reasons": {
+      "REGIME_FLIP": 7,
+      "SL_HIT": 8,
+      "L2_DANGER": 7
+    }
+  },
+  "filter_rule": "block entry when anomaly severity >= HIGH",
+  "conclusion": {
+    "pnl_improvement": 20.72,
+    "pf_improvement": Infinity,
+    "trades_blocked": 22,
+    "blocked_pnl": -20.72
+  }
+}

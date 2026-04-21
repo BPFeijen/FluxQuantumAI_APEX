@@ -1,0 +1,76 @@
+# 📜 Plano de Desenvolvimento: APEX_NEXTGEN (Parallel Architecture)
+
+**Versão:** 1.0 (Ref: FluxQuantumAI v3.2)  
+**Status:** Fase de Iniciação  
+**Protocolo:** Shadow Mode (Produção Intocável)
+
+---
+
+## 1. Visão Geral e Objetivo
+Restaurar a arquitetura modular de **Provedores de Estado** do ecossistema FluxQuantumAI, eliminando o monólito atual. O sistema operará em paralelo (Shadow Mode), consumindo dados da produção via sistema de arquivos (Watchdog), sem interferir na execução live.
+
+## 2. Diretrizes de Engenharia
+
+### 2.1 Isolamento de Produção
+- Diretório Raiz: `/apex_nextgen`
+- **Regra de Ouro:** Nenhuma alteração permitida nos diretórios `engine/` ou `ml_signal/` da produção atual.
+
+### 2.2 Data Ingestion (Opção A-Plus)
+- O NextGen utilizará a biblioteca `watchdog` para monitorar os CSVs de microestrutura e logs da Quantower gerados pela produção.
+- Processamento assíncrono para garantir latência mínima no Shadow Mode.
+
+### 2.3 Isomorfismo Inicial
+- O Gate 3 (FluxSignalEngine) deve replicar exatamente a lógica atual (ATS Zones + L2 Score 65) para garantir que o Scorecard compare a performance da arquitetura antes da estratégia.
+
+---
+
+## 3. Sprints de Desenvolvimento
+
+### 🟢 Sprint 1: Fundação e Shadow Ingestor
+**Objetivo:** Infraestrutura de dados e Monitoramento.
+- **1.1:** Estrutura de diretórios: `/providers`, `/engine`, `/analytics`, `/common`.
+- **1.2:** Implementação do `NextGenDataIngestor` (Watchdog nos CSVs da produção).
+- **1.3:** Implementação do `DailyScorecard`: Comparador automático entre `trades_live.jsonl` e decisões NextGen.
+- **1.4:** Definição da interface `BaseProvider` em `/common/base.py`.
+
+### 🔵 Sprint 2: Isomorfismo e Gating Hierárquico
+**Objetivo:** Replicar a alma da produção no novo corpo modular.
+- **2.1:** Migração da lógica do `event_processor.py` para o `providers/flux_signal_engine/`.
+- **2.2:** Implementação do `FoxyzeMasterEngine` (HUB de decisão).
+- **2.3:** Integração do `NewsProvider` como Gate 2.
+- **2.4:** Validação "Maçãs com Maçãs" no Scorecard.
+
+### 🟡 Sprint 3: Integração ML V2 (SageMaker)
+**Objetivo:** Ativar os sensores inteligentes (Grenadier e Iceberg).
+- **3.1:** `AnomalyForge` (Gate 1): Integração do modelo LSTM-Autoencoder (MSE Score).
+- **3.2:** `OrderStorm` (Gate 4): Integração do `IcebergClassifier` (99.48%).
+- **3.3:** Ativação do **Sizing Dinâmico**: Multiplicadores de 0.25x a 1.50x baseados no risco contextual.
+
+### 🔴 Sprint 4: Inteligência V3 (RL)
+**Objetivo:** Otimização de decisão.
+- **4.1:** `RegimeDetector` (Gate 5) ativo.
+- **4.2:** Agente V3 (RL PPO) em modo de observação/sugestão.
+- **4.3:** Início da janela de 30 dias para validação de Swap.
+
+---
+
+## 4. Estrutura de Provedores (v3.2)
+
+| Provedor | Função | Veredito |
+| :--- | :--- | :--- |
+| **AnomalyForge** | Segurança (MSE) | `veto_status`, `anomaly_score` |
+| **NewsProvider** | Calendário Econômico | `multiplier`, `is_blocked` |
+| **FluxSignalEngine** | Direção (MNQ/GC) | `PRIMARY_SIGNAL (BUY/SELL)` |
+| **OrderStorm** | Iceberg/L2 Scan | `hidden_liquidity_score` |
+| **FoxyzeMaster** | Orquestração | `final_action`, `dynamic_sizing` |
+
+---
+
+## 5. Regras de Transição (The Swap)
+A substituição da produção pelo NextGen só ocorrerá após:
+1. **30 dias** de lucro simulado consistentemente superior ao real.
+2. **Drawdown** simulado inferior ao real.
+3. **Estabilidade técnica** comprovada (Zero crashes no Shadow Mode).
+
+---
+*FluxQuantumAI NextGen Deployment Plan - FluxFox Research Division*

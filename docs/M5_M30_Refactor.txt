@@ -1,0 +1,54 @@
+Boa auditoria. Agora sim chegaste ao problema de arquitectura e não apenas ao sintoma.
+
+Concordo com os pontos principais:
+
+_near_level() não pode continuar soberano usando levels M5
+NEAR band não pode depender do ATR proxy de microstructure
+displacement M5 vs ATR M30 é metodologicamente incoerente
+daily_trend actual continua a ser proxy e não uma fonte real D1/H4
+
+Quero seguir por fases, com prioridade na estabilidade sem criar mais ruído.
+
+Ordem de implementação aprovada:
+
+FASE 1 — estabilização imediata
+
+THR-1:
+trocar a NEAR band para ATR14 do M30 parquet
+remover dependência do ATR proxy de microstructure para esta lógica
+THR-3:
+overextension também passa a usar ATR14 do M30 parquet
+quero consistência da régua estrutural
+Auditoria:
+listar todos os pontos onde self._metrics["atr"] ainda está a ser usado
+classificar quais usos são aceitáveis e quais estão metodologicamente errados
+
+FASE 2 — hierarquia correcta
+4. _near_level():
+
+M30 passa a ser a referência estrutural principal
+M5 só pode entrar como refinamento
+M5 não pode continuar a ser gate soberano
+Separar explicitamente:
+contexto estrutural operável (M30)
+timing de entrada (M5 + microstructure)
+
+FASE 3 — displacement
+6. Rever _detect_trend_displacement():
+
+ou usa barras M30
+ou usa M5 com ATR M5
+não aceito mais lógica M5 comparada com ATR M30
+
+FASE 4 — bias
+7. Propor verdadeiro d1_h4_bias() com candles reais
+
+mas antes quero definição metodológica clara do que significa bullish/bearish em D1/H4
+não implementar heurística simplista sem justificar a aderência à metodologia
+
+Entreguem antes de codar:
+
+diff planeado
+impacto esperado de cada fase
+risco de regressão
+quais testes/backtests serão usados para validar

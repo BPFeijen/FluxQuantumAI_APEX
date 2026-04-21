@@ -1,0 +1,45 @@
+{
+  "feature_names": [
+    "vpin_30m",
+    "vpin_5m",
+    "ofi_5m",
+    "ofi_15m",
+    "ofi_30m",
+    "trade_intensity_5m",
+    "avg_trade_size_5m",
+    "large_trade_fraction_5m",
+    "buy_aggressor_ratio_5m",
+    "delta_acceleration",
+    "spread_zscore_30m",
+    "spread_zscore_2h",
+    "depth_ratio",
+    "depth_ratio_zscore_30m",
+    "vpin_slope_30m",
+    "dom_persistence",
+    "cancel_rate_5m"
+  ],
+  "n_features": 17,
+  "threshold_recon_p95": 5.888291980227223e-07,
+  "threshold_ocsvm_p5": 7969.151030071877,
+  "training_samples": 3505965,
+  "hyperparameters": {
+    "ae_batch": 512,
+    "ae_d_model": 128,
+    "ae_dropout": 0.1,
+    "ae_epochs": 50,
+    "ae_latent": 32,
+    "ae_layers": 4,
+    "ae_lr": 0.001,
+    "ae_nhead": 8,
+    "ocsvm_nu": 0.05
+  },
+  "ae_config": {
+    "input_dim": 17,
+    "d_model": 128,
+    "nhead": 8,
+    "num_layers": 4,
+    "latent_dim": 32,
+    "dropout": 0.1
+  },
+  "device": "cpu"
+}

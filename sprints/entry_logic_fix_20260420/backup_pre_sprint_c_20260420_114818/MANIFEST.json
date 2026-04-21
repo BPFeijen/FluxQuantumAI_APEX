@@ -1,0 +1,14 @@
+{
+  "sprint": "entry_logic_fix_20260420 / Track C Implementation v2",
+  "backup_created_at_utc": "20260420_114818",
+  "purpose": "Pre-Sprint-C-v2 backup: derive_m30_bias_v2 + H4 gate mandatory",
+  "files": {
+    "level_detector.py":  {"hash_md5": "5e74e1ad645093cf325ada188c952f44"},
+    "event_processor.py": {"hash_md5": "1ade483a9389bf8354782857fd9d4f8f"},
+    "m30_updater.py":     {"hash_md5": "92c5bf66c3aa35ed3e8003441742dbae",  "note": "reference only, not modified in this sprint"},
+    "settings.json":      {"hash_md5": "8a0b28dbfb2f84ad287f9618d2712e59"}
+  },
+  "git_head_pre": "HEAD
+no_commits",
+  "restore_command_bash": "cp 'C:/FluxQuantumAI/sprints/entry_logic_fix_20260420/backup_pre_sprint_c_20260420_114818/level_detector.py' 'C:/FluxQuantumAI/live/'; cp 'C:/FluxQuantumAI/sprints/entry_logic_fix_20260420/backup_pre_sprint_c_20260420_114818/event_processor.py' 'C:/FluxQuantumAI/live/'; cp 'C:/FluxQuantumAI/sprints/entry_logic_fix_20260420/backup_pre_sprint_c_20260420_114818/settings.json' 'C:/FluxQuantumAI/config/'; nssm restart FluxQuantumAPEX"
+}

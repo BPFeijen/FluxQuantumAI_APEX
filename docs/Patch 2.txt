@@ -1,0 +1,39 @@
+Sim, vamos iniciar o PATCH 2.
+
+Barbara esta correcta:
+o cenario de hoje e exactamente o buraco actual do sistema.
+Sem PATCH 2, o sistema continua sem mecanismo suficiente para capturar trend days sem pullback profundo.
+
+Mas quero um escopo CIRURGICO.
+
+PATCH 2A — Trend Day Coverage
+
+Objectivo:
+dar cobertura operacional para dias de trend forte, sem depender apenas de pullback profundo ao liq_bot.
+
+Escopo desta fase
+Activar TREND_CONTINUATION em demo controlada
+Separar comportamento de EXPANSION vs TREND para continuation
+Garantir que o sistema nao fica "sem estrategia" em dias de trend
+Nao fazer agora
+nao fazer refactor gigante da Strategy Engine
+nao mexer em tudo ao mesmo tempo
+nao reabrir Phase Engine
+nao fazer redesign total de score logic
+O que quero nesta fase
+Regras explicitas para continuation em:
+EXPANSION
+TREND
+Critérios minimos:
+delta real
+exhaustion filter activo
+displacement valido
+guardrails contra entrada tardia / overextension
+Deliverable
+Antes de deploy:
+documento curto da logica
+exemplos do tipo de trade que agora passa
+exemplos do tipo de trade que continua bloqueado
+
+Queremos resolver o problema real do dia:
+sem PATCH 2A, o sistema continua a ver o trend andar sem entrar.

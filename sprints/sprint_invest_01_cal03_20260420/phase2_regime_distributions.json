@@ -1,0 +1,293 @@
+{
+  "source_v5": "C:\\data\\processed\\gc_ats_features_v5.parquet",
+  "source_cal": "C:\\data\\processed\\calibration_dataset_full.parquet",
+  "v5_rows": 73120,
+  "v5_range": "2020-01-01 23:00:00+00:00 \u2192 2026-03-31 23:30:00+00:00",
+  "cal_rows": 2192669,
+  "cal_range": "2020-01-01 23:00:00+00:00 \u2192 2026-04-07 22:01:00+00:00",
+  "regime_classifier": {
+    "RANGE": "m30_in_contraction == True AND weekly_aligned == False",
+    "TREND": "m30_in_contraction == False AND weekly_aligned == True AND daily_trend in (long, short)",
+    "TRANSITIONAL": "else"
+  },
+  "regime_distribution_by_period": {
+    "full_2020_2026": {
+      "rows": 73074,
+      "range": "2020-01-01 23:00:00+00:00 \u2192 2026-03-31 00:00:00+00:00",
+      "regime": {
+        "TREND": {
+          "count": 37299,
+          "pct": 51.04
+        },
+        "TRANSITIONAL": {
+          "count": 29782,
+          "pct": 40.76
+        },
+        "RANGE": {
+          "count": 5993,
+          "pct": 8.2
+        },
+        "_total": 73074
+      },
+      "regime_dir": {
+        "TREND_UP": {
+          "count": 29816,
+          "pct": 40.8
+        },
+        "TRANSITIONAL": {
+          "count": 29782,
+          "pct": 40.76
+        },
+        "TREND_DN": {
+          "count": 7483,
+          "pct": 10.24
+        },
+        "RANGE": {
+          "count": 5993,
+          "pct": 8.2
+        },
+        "_total": 73074
+      }
+    },
+    "pre_sprint8_2020_2025H1": {
+      "rows": 64864,
+      "range": "2020-01-01 23:00:00+00:00 \u2192 2025-06-30 00:00:00+00:00",
+      "regime": {
+        "TREND": {
+          "count": 31895,
+          "pct": 49.17
+        },
+        "TRANSITIONAL": {
+          "count": 27173,
+          "pct": 41.89
+        },
+        "RANGE": {
+          "count": 5796,
+          "pct": 8.94
+        },
+        "_total": 64864
+      },
+      "regime_dir": {
+        "TRANSITIONAL": {
+          "count": 27173,
+          "pct": 41.89
+        },
+        "TREND_UP": {
+          "count": 24412,
+          "pct": 37.64
+        },
+        "TREND_DN": {
+          "count": 7483,
+          "pct": 11.54
+        },
+        "RANGE": {
+          "count": 5796,
+          "pct": 8.94
+        },
+        "_total": 64864
+      }
+    },
+    "sprint8_training_era_2025_Jul_Nov": {
+      "rows": 4967,
+      "range": "2025-07-01 00:00:00+00:00 \u2192 2025-11-28 19:30:00+00:00",
+      "regime": {
+        "TREND": {
+          "count": 3283,
+          "pct": 66.1
+        },
+        "TRANSITIONAL": {
+          "count": 1534,
+          "pct": 30.88
+        },
+        "RANGE": {
+          "count": 150,
+          "pct": 3.02
+        },
+        "_total": 4967
+      },
+      "regime_dir": {
+        "TREND_UP": {
+          "count": 3283,
+          "pct": 66.1
+        },
+        "TRANSITIONAL": {
+          "count": 1534,
+          "pct": 30.88
+        },
+        "RANGE": {
+          "count": 150,
+          "pct": 3.02
+        },
+        "_total": 4967
+      }
+    },
+    "post_deploy_2025_Dec_2026_Mar": {
+      "rows": 3196,
+      "range": "2025-12-01 00:00:00+00:00 \u2192 2026-03-31 00:00:00+00:00",
+      "regime": {
+        "TREND": {
+          "count": 2121,
+          "pct": 66.36
+        },
+        "TRANSITIONAL": {
+          "count": 1035,
+          "pct": 32.38
+        },
+        "RANGE": {
+          "count": 40,
+          "pct": 1.25
+        },
+        "_total": 3196
+      },
+      "regime_dir": {
+        "TREND_UP": {
+          "count": 2121,
+          "pct": 66.36
+        },
+        "TRANSITIONAL": {
+          "count": 1035,
+          "pct": 32.38
+        },
+        "RANGE": {
+          "count": 40,
+          "pct": 1.25
+        },
+        "_total": 3196
+      }
+    },
+    "recent_live_2026_Apr": {
+      "note": "EMPTY (no rows in period \u2014 v5 staleness 2026-03-31)",
+      "rows": 0
+    }
+  },
+  "delta_4h_extremes_per_regime_by_period": {
+    "full_2020_2026": {
+      "rows_matched": 2186241,
+      "breakdown": {
+        "RANGE": {
+          "N": 179066,
+          "d4h_ext_neg_lt_-1050": 484,
+          "d4h_ext_pos_gt_+3000": 0,
+          "d4h_ext_neg_lt_-800": 854,
+          "d4h_ext_pos_gt_+800": 35
+        },
+        "TREND_UP": {
+          "N": 892552,
+          "d4h_ext_neg_lt_-1050": 14087,
+          "d4h_ext_pos_gt_+3000": 961,
+          "d4h_ext_neg_lt_-800": 20326,
+          "d4h_ext_pos_gt_+800": 16094
+        },
+        "TREND_DN": {
+          "N": 224237,
+          "d4h_ext_neg_lt_-1050": 0,
+          "d4h_ext_pos_gt_+3000": 0,
+          "d4h_ext_neg_lt_-800": 0,
+          "d4h_ext_pos_gt_+800": 0
+        },
+        "TRANSITIONAL": {
+          "N": 890386,
+          "d4h_ext_neg_lt_-1050": 6106,
+          "d4h_ext_pos_gt_+3000": 622,
+          "d4h_ext_neg_lt_-800": 8930,
+          "d4h_ext_pos_gt_+800": 5372
+        }
+      }
+    },
+    "pre_sprint8_2020_2025H1": {
+      "rows_matched": 1941835,
+      "breakdown": {
+        "RANGE": {
+          "N": 173194,
+          "d4h_ext_neg_lt_-1050": 0,
+          "d4h_ext_pos_gt_+3000": 0,
+          "d4h_ext_neg_lt_-800": 0,
+          "d4h_ext_pos_gt_+800": 0
+        },
+        "TREND_UP": {
+          "N": 731492,
+          "d4h_ext_neg_lt_-1050": 0,
+          "d4h_ext_pos_gt_+3000": 0,
+          "d4h_ext_neg_lt_-800": 0,
+          "d4h_ext_pos_gt_+800": 0
+        },
+        "TREND_DN": {
+          "N": 224237,
+          "d4h_ext_neg_lt_-1050": 0,
+          "d4h_ext_pos_gt_+3000": 0,
+          "d4h_ext_neg_lt_-800": 0,
+          "d4h_ext_pos_gt_+800": 0
+        },
+        "TRANSITIONAL": {
+          "N": 812912,
+          "d4h_ext_neg_lt_-1050": 0,
+          "d4h_ext_pos_gt_+3000": 0,
+          "d4h_ext_neg_lt_-800": 0,
+          "d4h_ext_pos_gt_+800": 0
+        }
+      }
+    },
+    "sprint8_training_era_2025_Jul_Nov": {
+      "rows_matched": 148870,
+      "breakdown": {
+        "RANGE": {
+          "N": 4491,
+          "d4h_ext_neg_lt_-1050": 484,
+          "d4h_ext_pos_gt_+3000": 0,
+          "d4h_ext_neg_lt_-800": 854,
+          "d4h_ext_pos_gt_+800": 35
+        },
+        "TREND_UP": {
+          "N": 98424,
+          "d4h_ext_neg_lt_-1050": 13283,
+          "d4h_ext_pos_gt_+3000": 901,
+          "d4h_ext_neg_lt_-800": 19388,
+          "d4h_ext_pos_gt_+800": 15622
+        },
+        "TREND_DN": {
+          "N": 0
+        },
+        "TRANSITIONAL": {
+          "N": 45955,
+          "d4h_ext_neg_lt_-1050": 5771,
+          "d4h_ext_pos_gt_+3000": 599,
+          "d4h_ext_neg_lt_-800": 8519,
+          "d4h_ext_pos_gt_+800": 5289
+        }
+      }
+    },
+    "post_deploy_2025_Dec_2026_Mar": {
+      "rows_matched": 94097,
+      "breakdown": {
+        "RANGE": {
+          "N": 1171,
+          "d4h_ext_neg_lt_-1050": 0,
+          "d4h_ext_pos_gt_+3000": 0,
+          "d4h_ext_neg_lt_-800": 0,
+          "d4h_ext_pos_gt_+800": 0
+        },
+        "TREND_UP": {
+          "N": 62636,
+          "d4h_ext_neg_lt_-1050": 804,
+          "d4h_ext_pos_gt_+3000": 60,
+          "d4h_ext_neg_lt_-800": 938,
+          "d4h_ext_pos_gt_+800": 472
+        },
+        "TREND_DN": {
+          "N": 0
+        },
+        "TRANSITIONAL": {
+          "N": 30290,
+          "d4h_ext_neg_lt_-1050": 335,
+          "d4h_ext_pos_gt_+3000": 23,
+          "d4h_ext_neg_lt_-800": 411,
+          "d4h_ext_pos_gt_+800": 83
+        }
+      }
+    },
+    "recent_live_2026_Apr": {
+      "note": "EMPTY in this period",
+      "rows": 0
+    }
+  }
+}

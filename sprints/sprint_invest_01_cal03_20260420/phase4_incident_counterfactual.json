@@ -1,0 +1,264 @@
+{
+  "incident_source": "C:\\FluxQuantumAI\\sprints\\INCIDENT_20260420_LONG_DURING_DROP\\20260420_145845\\decision_log_last60min.jsonl",
+  "n_go_long_entries": 8,
+  "per_entry": [
+    {
+      "i": 1,
+      "ts": "2026-04-20 14:09:05.241523+00:00",
+      "phase": "TREND",
+      "daily_trend": "short",
+      "m30_bias": "bullish",
+      "m30_bias_confirmed": true,
+      "session": "NY",
+      "reconstructed_regime": "TREND",
+      "reconstructed_regime_dir": "TREND_DN",
+      "delta_4h_live": -473.0,
+      "trigger_type": "ALPHA",
+      "trigger_level_type": "liq_bot",
+      "v4_iceberg_status": "NEUTRAL",
+      "v4_iceberg_aligned": true,
+      "v3_delta_4h_gate_score": 0,
+      "decision_reason": "iceberg sweep sc=+2",
+      "total_score": 2,
+      "fwd_return_30m_pts_actual": 1.45,
+      "fwd_return_60m_pts_actual": -15.95,
+      "fwd_return_4h_pts_actual": 0.75,
+      "historical_base_rate_d4h_lt_-1050_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null,
+        "wr_positive_30m": null
+      },
+      "historical_base_rate_d4h_lt_-500_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null
+      }
+    },
+    {
+      "i": 2,
+      "ts": "2026-04-20 14:12:45.580528+00:00",
+      "phase": "TREND",
+      "daily_trend": "short",
+      "m30_bias": "bullish",
+      "m30_bias_confirmed": true,
+      "session": "NY",
+      "reconstructed_regime": "TREND",
+      "reconstructed_regime_dir": "TREND_DN",
+      "delta_4h_live": -487.0,
+      "trigger_type": "ALPHA",
+      "trigger_level_type": "liq_bot",
+      "v4_iceberg_status": "NEUTRAL",
+      "v4_iceberg_aligned": true,
+      "v3_delta_4h_gate_score": 0,
+      "decision_reason": "iceberg sweep sc=+2",
+      "total_score": 2,
+      "fwd_return_30m_pts_actual": 2.35,
+      "fwd_return_60m_pts_actual": -10.85,
+      "fwd_return_4h_pts_actual": 4.35,
+      "historical_base_rate_d4h_lt_-1050_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null,
+        "wr_positive_30m": null
+      },
+      "historical_base_rate_d4h_lt_-500_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null
+      }
+    },
+    {
+      "i": 3,
+      "ts": "2026-04-20 14:12:47.656048+00:00",
+      "phase": "TREND",
+      "daily_trend": "short",
+      "m30_bias": "bullish",
+      "m30_bias_confirmed": true,
+      "session": "NY",
+      "reconstructed_regime": "TREND",
+      "reconstructed_regime_dir": "TREND_DN",
+      "delta_4h_live": -487.0,
+      "trigger_type": "ALPHA",
+      "trigger_level_type": "liq_bot",
+      "v4_iceberg_status": "NEUTRAL",
+      "v4_iceberg_aligned": true,
+      "v3_delta_4h_gate_score": 0,
+      "decision_reason": "iceberg sweep sc=+2",
+      "total_score": 2,
+      "fwd_return_30m_pts_actual": 2.35,
+      "fwd_return_60m_pts_actual": -10.85,
+      "fwd_return_4h_pts_actual": 4.35,
+      "historical_base_rate_d4h_lt_-1050_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null,
+        "wr_positive_30m": null
+      },
+      "historical_base_rate_d4h_lt_-500_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null
+      }
+    },
+    {
+      "i": 4,
+      "ts": "2026-04-20 14:37:08.032067+00:00",
+      "phase": "TREND",
+      "daily_trend": "short",
+      "m30_bias": "bullish",
+      "m30_bias_confirmed": true,
+      "session": "NY",
+      "reconstructed_regime": "TREND",
+      "reconstructed_regime_dir": "TREND_DN",
+      "delta_4h_live": -748.0,
+      "trigger_type": "ALPHA",
+      "trigger_level_type": "liq_bot",
+      "v4_iceberg_status": "NEUTRAL",
+      "v4_iceberg_aligned": true,
+      "v3_delta_4h_gate_score": 0,
+      "decision_reason": "iceberg sweep sc=+2",
+      "total_score": 2,
+      "fwd_return_30m_pts_actual": -18.45,
+      "fwd_return_60m_pts_actual": -13.75,
+      "fwd_return_4h_pts_actual": -3.05,
+      "historical_base_rate_d4h_lt_-1050_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null,
+        "wr_positive_30m": null
+      },
+      "historical_base_rate_d4h_lt_-500_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null
+      }
+    },
+    {
+      "i": 5,
+      "ts": "2026-04-20 14:37:10.304337+00:00",
+      "phase": "TREND",
+      "daily_trend": "short",
+      "m30_bias": "bullish",
+      "m30_bias_confirmed": true,
+      "session": "NY",
+      "reconstructed_regime": "TREND",
+      "reconstructed_regime_dir": "TREND_DN",
+      "delta_4h_live": -748.0,
+      "trigger_type": "ALPHA",
+      "trigger_level_type": "liq_bot",
+      "v4_iceberg_status": "NEUTRAL",
+      "v4_iceberg_aligned": true,
+      "v3_delta_4h_gate_score": 0,
+      "decision_reason": "iceberg sweep sc=+2",
+      "total_score": 2,
+      "fwd_return_30m_pts_actual": -18.45,
+      "fwd_return_60m_pts_actual": -13.75,
+      "fwd_return_4h_pts_actual": -3.05,
+      "historical_base_rate_d4h_lt_-1050_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null,
+        "wr_positive_30m": null
+      },
+      "historical_base_rate_d4h_lt_-500_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null
+      }
+    },
+    {
+      "i": 6,
+      "ts": "2026-04-20 14:37:12.332425+00:00",
+      "phase": "TREND",
+      "daily_trend": "short",
+      "m30_bias": "bullish",
+      "m30_bias_confirmed": true,
+      "session": "NY",
+      "reconstructed_regime": "TREND",
+      "reconstructed_regime_dir": "TREND_DN",
+      "delta_4h_live": -748.0,
+      "trigger_type": "ALPHA",
+      "trigger_level_type": "liq_bot",
+      "v4_iceberg_status": "NEUTRAL",
+      "v4_iceberg_aligned": true,
+      "v3_delta_4h_gate_score": 0,
+      "decision_reason": "iceberg sweep sc=+2",
+      "total_score": 2,
+      "fwd_return_30m_pts_actual": -18.45,
+      "fwd_return_60m_pts_actual": -13.75,
+      "fwd_return_4h_pts_actual": -3.05,
+      "historical_base_rate_d4h_lt_-1050_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null,
+        "wr_positive_30m": null
+      },
+      "historical_base_rate_d4h_lt_-500_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null
+      }
+    },
+    {
+      "i": 7,
+      "ts": "2026-04-20 14:56:44.256754+00:00",
+      "phase": "TREND",
+      "daily_trend": "short",
+      "m30_bias": "bullish",
+      "m30_bias_confirmed": true,
+      "session": "NY",
+      "reconstructed_regime": "TREND",
+      "reconstructed_regime_dir": "TREND_DN",
+      "delta_4h_live": -1133.0,
+      "trigger_type": "ALPHA",
+      "trigger_level_type": "liq_bot",
+      "v4_iceberg_status": "NEUTRAL",
+      "v4_iceberg_aligned": true,
+      "v3_delta_4h_gate_score": 2,
+      "decision_reason": "momentum OK (d4h=-1121) | iceberg large_order sc=+3",
+      "total_score": 5,
+      "fwd_return_30m_pts_actual": 2.35,
+      "fwd_return_60m_pts_actual": -7.55,
+      "fwd_return_4h_pts_actual": 9.75,
+      "historical_base_rate_d4h_lt_-1050_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null,
+        "wr_positive_30m": null
+      },
+      "historical_base_rate_d4h_lt_-500_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null
+      }
+    },
+    {
+      "i": 8,
+      "ts": "2026-04-20 14:56:47.781229+00:00",
+      "phase": "TREND",
+      "daily_trend": "short",
+      "m30_bias": "bullish",
+      "m30_bias_confirmed": true,
+      "session": "NY",
+      "reconstructed_regime": "TREND",
+      "reconstructed_regime_dir": "TREND_DN",
+      "delta_4h_live": -1136.0,
+      "trigger_type": "ALPHA",
+      "trigger_level_type": "liq_bot",
+      "v4_iceberg_status": "NEUTRAL",
+      "v4_iceberg_aligned": true,
+      "v3_delta_4h_gate_score": 2,
+      "decision_reason": "momentum OK (d4h=-1124) | iceberg large_order sc=+3",
+      "total_score": 5,
+      "fwd_return_30m_pts_actual": 2.35,
+      "fwd_return_60m_pts_actual": -7.55,
+      "fwd_return_4h_pts_actual": 9.75,
+      "historical_base_rate_d4h_lt_-1050_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null,
+        "wr_positive_30m": null
+      },
+      "historical_base_rate_d4h_lt_-500_same_regime": {
+        "N": 0,
+        "mean_30m_pts": null
+      }
+    }
+  ],
+  "aggregate": {
+    "regime_dir_distribution": {
+      "TREND_DN": 8
+    },
+    "fwd_30m_actual_mean_pts": -5.56,
+    "fwd_30m_actual_median_pts": 1.9,
+    "delta_4h_live_mean": -745.0,
+    "delta_4h_live_min": -1136.0,
+    "n_entries_with_d4h_lt_-1050": 2
+  }
+}

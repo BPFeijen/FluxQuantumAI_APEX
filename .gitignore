@@ -1,0 +1,30 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Data / logs / outputs
+data/
+logs/
+Backups/
+results/
+reports/
+
+# Deploy snapshots / temporary
+deploy-staging-*/
+deploy-staging-scope-a-*/
+*.log
+
+# Windows / misc
+Thumbs.db
+.DS_Store
+
+# Large / local artifacts
+*.parquet
+*.csv.gz
+*.jsonl
+
+# Secrets / local config
+.env
+
+live/telegram_notifier.py

@@ -1,0 +1,47 @@
+# WeeklyGold News Provider Configuration
+default_asset: "GC"
+
+tradingeconomics:
+  api_key: "guest:guest"
+  countries:
+    - "united states"
+    - "china"
+    - "euro area"
+    - "united kingdom"
+    - "japan"
+    - "switzerland"
+    - "australia"
+    - "canada"
+    - "india"
+  min_importance: 2
+  cache_minutes: 60
+
+alpha_vantage:
+  api_key: "QGKMJA8AVOFQLMDG"
+  topics:
+    - economy_fiscal
+    - economy_monetary
+    - energy_transportation
+  tickers:
+    - GLD
+    - IAU
+  cache_minutes: 30
+
+gold_blocking:
+  block_threshold: 2.5
+  caution_threshold: 1.5
+  monitor_threshold: 0.5
+
+risk_thresholds:
+  normal: 0.3
+  caution: 0.5
+  reduced: 0.7
+  blocked: 0.9
+  exit_all: 1.0
+
+position_multipliers:
+  normal: 1.0
+  caution: 0.75
+  reduced: 0.50
+  blocked: 0.0
+  exit_all: 0.0

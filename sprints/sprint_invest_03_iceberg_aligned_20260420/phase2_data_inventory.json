@@ -1,0 +1,296 @@
+{
+  "generated_at": "2026-04-21 06:52:54.574184+00:00",
+  "window": {
+    "start": "2025-07-01 00:00:00+00:00",
+    "end": "2026-04-21 00:00:00+00:00"
+  },
+  "l2_coverage": {
+    "ohlcv_rows_in_window": 0,
+    "l2_columns_count": 0,
+    "daily_l2_pct_mean": 0.0,
+    "days_lt_50pct": 229,
+    "days_zero": 229,
+    "gaps_gt_4h_count": 50,
+    "gaps_gt_4h_sample": [
+      {
+        "before": "2025-07-06 22:00:00+00:00",
+        "gap_hours": 53.02
+      },
+      {
+        "before": "2025-07-13 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-07-20 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-07-27 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-08-03 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-08-10 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-08-17 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-08-24 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-08-31 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-09-07 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-09-14 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-09-21 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-09-28 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-10-05 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-10-12 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-10-19 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-10-26 22:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-11-02 23:00:00+00:00",
+        "gap_hours": 50.02
+      },
+      {
+        "before": "2025-11-09 23:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-11-16 23:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-11-23 23:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-11-28 13:30:00+00:00",
+        "gap_hours": 10.7
+      },
+      {
+        "before": "2025-11-30 23:00:00+00:00",
+        "gap_hours": 51.27
+      },
+      {
+        "before": "2025-12-07 23:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-12-14 23:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-12-21 23:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2025-12-25 23:00:00+00:00",
+        "gap_hours": 28.27
+      },
+      {
+        "before": "2025-12-28 23:00:00+00:00",
+        "gap_hours": 49.02
+      },
+      {
+        "before": "2026-01-01 23:00:00+00:00",
+        "gap_hours": 25.02
+      },
+      {
+        "before": "2026-01-05 00:00:00+00:00",
+        "gap_hours": 50.02
+      }
+    ],
+    "by_period": {
+      "sprint8_training_2025_Jul_Nov": {
+        "rows": 148870,
+        "rows_with_l2": 0,
+        "pct_with_l2": 0.0,
+        "days": 130
+      },
+      "dxfeed_transition_late_Nov_early_Dec": {
+        "rows": 18379,
+        "rows_with_l2": 0,
+        "pct_with_l2": 0.0,
+        "days": 18
+      },
+      "post_deploy_2025_Dec_2026_Mar": {
+        "rows": 94097,
+        "rows_with_l2": 0,
+        "pct_with_l2": 0.0,
+        "days": 81
+      },
+      "recent_2026_Apr": {
+        "rows": 15671,
+        "rows_with_l2": 0,
+        "pct_with_l2": 0.0,
+        "days": 17
+      }
+    }
+  },
+  "iceberg_inventory": {
+    "jsonl_files": 392,
+    "total_events_all_time": 15550737,
+    "total_events_in_window": 15543456,
+    "unique_dates_in_window": 142,
+    "schema_keys_top10": [
+      [
+        "symbol",
+        1840
+      ],
+      [
+        "timestamp",
+        1840
+      ],
+      [
+        "price",
+        1840
+      ],
+      [
+        "side",
+        1840
+      ],
+      [
+        "iceberg_type",
+        1840
+      ],
+      [
+        "probability",
+        1840
+      ],
+      [
+        "peak_size",
+        1840
+      ],
+      [
+        "executed_size",
+        1840
+      ],
+      [
+        "refill_count",
+        1840
+      ],
+      [
+        "time_since_trade_ms",
+        1840
+      ]
+    ],
+    "side_counts": {
+      "bid": 7703886,
+      "ask": 7839570
+    },
+    "type_counts_top10": [
+      [
+        "",
+        15543456
+      ]
+    ],
+    "probability_bins": {
+      "lt_0.50": 3260633,
+      "0.50-0.80": 3723189,
+      "0.90-0.95": 6077100,
+      "0.80-0.90": 1433722,
+      "gte_0.95": 1048812
+    },
+    "events_by_period": {
+      "sprint8_training_2025_Jul_Nov": {
+        "events": 5875835,
+        "sides": {
+          "ask": "2947092",
+          "bid": "2928743"
+        }
+      },
+      "dxfeed_transition_late_Nov_early_Dec": {
+        "events": 121808,
+        "sides": {
+          "ask": "71366",
+          "bid": "50442"
+        }
+      },
+      "post_deploy_2025_Dec_2026_Mar": {
+        "events": 8509282,
+        "sides": {
+          "ask": "4309220",
+          "bid": "4200062"
+        }
+      },
+      "recent_2026_Apr": {
+        "events": 1132117,
+        "sides": {
+          "ask": "570552",
+          "bid": "561565"
+        }
+      }
+    }
+  },
+  "regime_tagging": {
+    "v5_rows": 73120,
+    "v5_range": "2020-01-01 23:00:00+00:00 \u2192 2026-03-31 23:30:00+00:00",
+    "events_per_cell_by_period": {
+      "sprint8_training_2025_Jul_Nov": {
+        "total_events": 5875835,
+        "by_regime_dir_effective": {
+          "RANGE": 481998,
+          "TREND_UP": 1803233,
+          "TRANSITIONAL": 3590604
+        }
+      },
+      "dxfeed_transition_late_Nov_early_Dec": {
+        "total_events": 121808,
+        "by_regime_dir_effective": {
+          "TREND_UP": 103456,
+          "TRANSITIONAL": 18352
+        }
+      },
+      "post_deploy_2025_Dec_2026_Mar": {
+        "total_events": 8509282,
+        "by_regime_dir_effective": {
+          "RANGE": 414679,
+          "TREND_UP": 5626128,
+          "TRANSITIONAL": 2438194,
+          "TREND_UP_fb": 7,
+          "TREND_DN_fb": 7,
+          "TRANSITIONAL_fb": 30267
+        }
+      },
+      "recent_2026_Apr": {
+        "total_events": 1132117,
+        "by_regime_dir_effective": {
+          "TRANSITIONAL_fb": 1132117
+        }
+      }
+    }
+  }
+}

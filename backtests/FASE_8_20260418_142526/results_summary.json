@@ -1,0 +1,108 @@
+{
+  "backtest_id": "FASE_8_20260418_142526",
+  "config": "APEX_actual_post_Fase7 \u2014 MINIMAL ENGINE (ALPHA only)",
+  "account": "RoboForex_demo_68302120",
+  "period_start": "2026-04-01",
+  "period_end": "2026-04-10",
+  "data_source": "C:\\data\\processed\\calibration_dataset_full.parquet",
+  "engine": "new: C:\\FluxQuantumAI\\backtests\\fase_8_backtest.py",
+  "live_modules_used": [
+    "ats_live_gate.ATSLiveGate.check()"
+  ],
+  "not_implemented": [
+    "GAMMA/DELTA triggers (0 historical fires \u2014 per Fase 2.5b audit)",
+    "L2 danger exit",
+    "Regime flip exit",
+    "Trailing stop post-SHIELD",
+    "News gate (ApexNewsGate module not installed)",
+    "Hedge manager"
+  ],
+  "runtime_s": 333.5,
+  "metrics_overall": {
+    "rows_in_slice": 5051,
+    "rows_with_essentials": 3787,
+    "triggers_detected": 138,
+    "gate_go": 102,
+    "gate_block": 36,
+    "gate_error": 0,
+    "trades_simulated": 102,
+    "winners": 39,
+    "losers": 63,
+    "breakeven": 0,
+    "win_rate_pct": 38.24,
+    "total_pnl_usd": -717.55,
+    "profit_factor": 0.291,
+    "avg_win_usd": 7.55,
+    "avg_loss_usd": 16.06
+  },
+  "metrics_by_session": {
+    "Asian": {
+      "trades": 31,
+      "pnl_usd": 43.96
+    },
+    "London": {
+      "trades": 42,
+      "pnl_usd": -486.49
+    },
+    "NY": {
+      "trades": 29,
+      "pnl_usd": -275.02
+    }
+  },
+  "metrics_by_direction": {
+    "LONG": {
+      "trades": 48,
+      "pnl_usd": -242.65
+    },
+    "SHORT": {
+      "trades": 54,
+      "pnl_usd": -474.9
+    }
+  },
+  "top_block_reasons": [
+    {
+      "reason": "MOMENTUM: [blocked_by=impulse_30min] LONG: -81pts / delta=-9",
+      "count": 4
+    },
+    {
+      "reason": "MOMENTUM: [blocked_by=impulse_30min] LONG: -18pts / delta=-1",
+      "count": 4
+    },
+    {
+      "reason": "ABS_HARD_CONTRA: ratio=30.0 >= 12.28",
+      "count": 3
+    },
+    {
+      "reason": "score insuficiente (-1) | iceberg contra: abs(ask,r=4.5:-3) ",
+      "count": 2
+    },
+    {
+      "reason": "score insuficiente (-1) | iceberg contra: abs(bid,r=8.5:-4) ",
+      "count": 2
+    },
+    {
+      "reason": "MOMENTUM: [blocked_by=impulse_30min] LONG: -13pts / delta=-1",
+      "count": 2
+    },
+    {
+      "reason": "score insuficiente (-1) | iceberg contra: abs(bid,r=6.0:-4) ",
+      "count": 2
+    },
+    {
+      "reason": "ABS_HARD_CONTRA: ratio=72.0 >= 12.28",
+      "count": 2
+    },
+    {
+      "reason": "ABS_HARD_CONTRA: ratio=60.0 >= 12.28",
+      "count": 2
+    },
+    {
+      "reason": "ABS_HARD_CONTRA: ratio=18.0 >= 12.28",
+      "count": 2
+    }
+  ],
+  "cross_validation": {
+    "real_trades_in_period": 36,
+    "backtest_trades_in_period": 102
+  }
+}
