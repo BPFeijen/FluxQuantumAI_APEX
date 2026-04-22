@@ -68,6 +68,7 @@ from live.tick_breakout_monitor import TickBreakoutMonitor
 from live.kill_zones import kill_zone_label
 from live.price_speed import PriceSpeedTracker
 from live.level_detector import derive_m30_bias
+from live.regime_detectors import detect_trend_a, detect_trend_b
 from live import telegram_notifier as tg
 
 # Hantec live executor -- optional, graceful fallback
@@ -491,6 +492,13 @@ class EventProcessor:
         # M30 structural levels in MT5 space (updated by _refresh_offset)
         self.m30_liq_top:    float | None = None
         self.m30_liq_bot:    float | None = None
+        # M30 structural flags (derived per refresh from latest closed bar; IMPL-1)
+        self.m30_box_confirmed = False
+        self.at_struct_level   = False
+        # Regime detector state (IMPL-1). Shape: {"trend_a": (bool, dir), "trend_b": (bool, dir)}
+        # index [0] = is_active (bool); index [1] = direction ("LONG"|"SHORT"|"").
+        # Consumed by IMPL-2 features and IMPL-3 LOGIC-C scorer.
+        self._regime_state = {"trend_a": (False, ""), "trend_b": (False, "")}
         # --------------------------------------------------------------------
 
         self.dry_run      = dry_run
@@ -1636,6 +1644,25 @@ class EventProcessor:
                     self.m30_liq_bot = round(self.m30_liq_bot_gc - self._gc_xauusd_offset, 2)
                 self._macro_ctx_last_refresh = time.monotonic()
                 self._macro_ctx_refresh_needed = False
+
+                # --- IMPL-1: Regime detectors (read-only; zero decision impact) ---
+                latest_bar = df.iloc[-1]
+                self.m30_box_confirmed = bool(latest_bar.get("m30_box_confirmed", False))
+                self.at_struct_level   = bool(latest_bar.get("at_struct_level",   False))
+
+                closed_bars = df[df["m30_box_confirmed"] == True]  # noqa: E712 -- explicit bool compare for pandas
+                bar_history_list = closed_bars.tail(3).to_dict("records")
+                new_trend_a = detect_trend_a(bar_history_list, n_bars=3)
+                new_trend_b = detect_trend_b(self)
+
+                if new_trend_a != self._regime_state["trend_a"]:
+                    log.info("TREND-A state change: %s -> %s",
+                             self._regime_state["trend_a"], new_trend_a)
+                    self._regime_state["trend_a"] = new_trend_a
+                if new_trend_b != self._regime_state["trend_b"]:
+                    log.info("TREND-B state change: %s -> %s",
+                             self._regime_state["trend_b"], new_trend_b)
+                    self._regime_state["trend_b"] = new_trend_b
 
             if reason:
                 log.info(
