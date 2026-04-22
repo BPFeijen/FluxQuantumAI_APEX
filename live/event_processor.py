@@ -4244,6 +4244,7 @@ class EventProcessor:
         # Convert GC price -> MT5 XAUUSD price
         offset    = self._gc_xauusd_offset
         xau_price = round(gc_price - offset, 2)
+        self._metrics["xau_mid"] = xau_price
 
         ts = _ts()
         print(f"[{ts}] ICEBERG  GC={gc_price:.2f} | XAUUSD={xau_price:.2f}"
@@ -4410,6 +4411,7 @@ class EventProcessor:
                 offset    = self._gc_xauusd_offset
                 xau_price = round(gc_price - offset, 2)   # MT5 XAUUSD equivalent
                 self._speed_tracker.add_tick(xau_price)   # feed Price Speed tracker
+                self._metrics["xau_mid"] = xau_price
                 level_type, level_price = self._near_level(xau_price)
                 d4h = metrics.get("delta_4h", 0.0)
 
