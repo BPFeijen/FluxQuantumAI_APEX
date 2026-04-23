@@ -150,5 +150,8 @@
     "post_event_seconds": 1800,
     "block_new_entries": true,
     "telegram_notify": true
-  }
+  },
+  "ats_trend_line_enabled": true,
+  "ats_trend_line_shadow_mode": true,
+  "_ats_trend_line_note": "Part A: live/ats_trend_line.py — ATS Trend Line (3-candle + group inefficiency tracker). ENABLED flag signals module usability for downstream consumers (Part B trend classifier v2). SHADOW flag indicates no live decision impact yet; output is available for logging/backtest. See _audit/pp_sprint/ats_trend_line_part_a/ for backtest artifacts."
 }

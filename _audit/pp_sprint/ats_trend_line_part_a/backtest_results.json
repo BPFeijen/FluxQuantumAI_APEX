@@ -1,0 +1,78 @@
+{
+  "meta": {
+    "window_start": "2023-01-01 00:00:00+00:00",
+    "window_end": "2026-04-24 00:00:00+00:00",
+    "module": "live/ats_trend_line.py"
+  },
+  "per_tf": {
+    "D1": {
+      "tf": "D1",
+      "n_bars": 851,
+      "bars_range": [
+        "2023-01-02 00:00:00+00:00",
+        "2026-04-23 00:00:00+00:00"
+      ],
+      "n_ineff_3c": 217,
+      "n_ineff_3c_bull": 151,
+      "n_ineff_3c_bear": 66,
+      "n_ineff_group": 123,
+      "n_ineff_group_bull": 88,
+      "n_ineff_group_bear": 35,
+      "n_ineff_total": 340,
+      "n_dots": 71,
+      "dots_bull": 36,
+      "dots_bear": 35,
+      "dots_per_year_approx": 21.02,
+      "final_direction": 1,
+      "final_line_level": 4799.275,
+      "final_price_through_line": true,
+      "price_through_line_pct_monthly": 10.26
+    },
+    "H4": {
+      "tf": "H4",
+      "n_bars": 5190,
+      "bars_range": [
+        "2023-01-02 20:00:00+00:00",
+        "2026-04-23 20:00:00+00:00"
+      ],
+      "n_ineff_3c": 1168,
+      "n_ineff_3c_bull": 673,
+      "n_ineff_3c_bear": 495,
+      "n_ineff_group": 737,
+      "n_ineff_group_bull": 437,
+      "n_ineff_group_bear": 300,
+      "n_ineff_total": 1905,
+      "n_dots": 438,
+      "dots_bull": 219,
+      "dots_bear": 219,
+      "dots_per_year_approx": 127.6,
+      "final_direction": -1,
+      "final_line_level": 4726.175,
+      "final_price_through_line": false,
+      "price_through_line_pct_monthly": 5.13
+    },
+    "M30": {
+      "tf": "M30",
+      "n_bars": 38380,
+      "bars_range": [
+        "2023-01-02 23:00:00+00:00",
+        "2026-04-23 22:30:00+00:00"
+      ],
+      "n_ineff_3c": 7366,
+      "n_ineff_3c_bull": 4002,
+      "n_ineff_3c_bear": 3364,
+      "n_ineff_group": 4207,
+      "n_ineff_group_bull": 2330,
+      "n_ineff_group_bear": 1877,
+      "n_ineff_total": 11573,
+      "n_dots": 2947,
+      "dots_bull": 1474,
+      "dots_bear": 1473,
+      "dots_per_year_approx": 928.79,
+      "final_direction": 1,
+      "final_line_level": 4706.225,
+      "final_price_through_line": false,
+      "price_through_line_pct_monthly": 7.69
+    }
+  }
+}
