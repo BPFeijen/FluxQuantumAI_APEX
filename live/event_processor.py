@@ -3216,10 +3216,14 @@ class EventProcessor:
         phase = self._get_current_phase()
 
         # 1. Check PULLBACK first (existing logic)
+        # Note: "PULLBACK" keyword is embedded in reason strings so the substring
+        # classifier at _trigger_gate (:2782-2786) correctly maps entry_mode.
+        # Position after colon preserves .split(":")[0] semantics for strategy_mode.
+        # Fix per T1-X1-LOGGING-FIX (2026-04-23).
         if trend_direction == "LONG" and level_type == "liq_bot":
-            return ("PULLBACK", "LONG", "TRENDING_UP: liq_bot = buy the dip")
+            return ("PULLBACK", "LONG", "TRENDING_UP: PULLBACK liq_bot = buy the dip")
         if trend_direction == "SHORT" and level_type == "liq_top":
-            return ("PULLBACK", "SHORT", "TRENDING_DN: liq_top = sell the rally")
+            return ("PULLBACK", "SHORT", "TRENDING_DN: PULLBACK liq_top = sell the rally")
 
         # 2. Check CONTINUATION conditions
         if phase not in ("TREND", "EXPANSION"):
