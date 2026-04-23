@@ -687,6 +687,12 @@ class EventProcessor:
           1. decision_live.json  — latest state (atomic overwrite)
           2. decision_log.jsonl  — append-only audit trail
         Called after every gate check (GO or BLOCK).
+
+        Retention contract (see docs/DECISION_LOG_RETENTION_POLICY.md):
+          - decision_log.jsonl is APPEND-ONLY. Never truncate, rename, or delete.
+          - Target retention: 90 days online minimum (~360 MB projected).
+          - Pre-deploy snapshots: scripts/preserve_decision_log.py
+          - Any rotation / compaction must be documented in the policy doc first.
         """
         # Add decision_id and created_at
         decision_data["decision_id"] = str(uuid.uuid4())[:8]
