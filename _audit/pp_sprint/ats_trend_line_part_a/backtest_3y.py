@@ -45,6 +45,7 @@ def load_m30_3y() -> pd.DataFrame:
 
 
 def resample_ohlc(df: pd.DataFrame, rule: str, weekday_only: bool = False) -> pd.DataFrame:
+    """UTC-anchored resample. Kept for intraday rules (e.g. '4h'); DO NOT use for '1D'."""
     agg = pd.DataFrame({
         "open": df["open"].resample(rule).first(),
         "high": df["high"].resample(rule).max(),
@@ -53,6 +54,42 @@ def resample_ohlc(df: pd.DataFrame, rule: str, weekday_only: bool = False) -> pd
     }).dropna()
     if weekday_only:
         agg = agg[agg.index.dayofweek < 5]
+    return agg
+
+
+# ---------------------------------------------------------------------------
+# D1 aligned to CME/COMEX GC session boundaries (17:00 ET close, DST-aware).
+# Quantower GC:XCEC D1 bars are indexed by session-close date; a bar at
+# 18:00 ET on date D-1 (session open) belongs to session D. Formula:
+# bar_et + 6h, floor-to-date-ET gives the session label.
+#
+# Also emits `n_m30_bars` and `is_complete` so downstream ATS Trend Line
+# detection can skip sessions that had Level2 capture holes (see
+# _audit/data_gaps_report.md).
+# ---------------------------------------------------------------------------
+_EXPECTED_M30_PER_SESSION = 46   # 23 trading hours * 2 M30 bars
+_COMPLETE_COVERAGE = 0.80
+
+
+def resample_d1_et_session(df: pd.DataFrame, weekday_only: bool = True) -> pd.DataFrame:
+    """D1 resample aligned to CME/COMEX GC session close (17:00 ET, DST-aware)."""
+    if df.index.tz is None:
+        df = df.copy()
+        df.index = df.index.tz_localize("UTC")
+    et = df.index.tz_convert("America/New_York")
+    keys = pd.DatetimeIndex((et + pd.Timedelta(hours=6)).normalize()).tz_localize(None)
+    g = df.assign(__key=keys).groupby("__key", sort=True)
+    agg = pd.DataFrame({
+        "open":  g["open"].first(),
+        "high":  g["high"].max(),
+        "low":   g["low"].min(),
+        "close": g["close"].last(),
+        "n_m30_bars": g.size(),
+    }).dropna(subset=["close"])
+    if weekday_only:
+        agg = agg[agg.index.dayofweek < 5]
+    agg["coverage"] = agg["n_m30_bars"] / _EXPECTED_M30_PER_SESSION
+    agg["is_complete"] = agg["coverage"] >= _COMPLETE_COVERAGE
     return agg
 
 
@@ -118,6 +155,7 @@ def analyze_tf(bars: pd.DataFrame, tf_label: str) -> dict:
         "final_price_through_line": bool(final_state.price_through_line),
         "price_through_line_pct_monthly": round(price_thru_count / total_snapshots * 100, 2) if total_snapshots else 0,
         "timeline": timeline,
+        "dots": dots,
     }
 
 
@@ -127,8 +165,19 @@ def main():
     print(f"  M30 raw: {len(m30):,} bars [{m30.index.min()} → {m30.index.max()}]")
 
     # Build TFs
-    print("Resampling to D1, H4, M30...")
-    d1 = resample_ohlc(m30, "1D", weekday_only=True)
+    print("Resampling to D1 (ET session, gap-aware), H4, M30...")
+    d1_full = resample_d1_et_session(m30, weekday_only=True)
+    n_d1_total = len(d1_full)
+    n_d1_incomplete = int((~d1_full["is_complete"]).sum())
+    flagged_dates = [str(ts.date()) for ts in d1_full[~d1_full["is_complete"]].index]
+    print(f"  D1 sessions: {n_d1_total} (complete: {n_d1_total - n_d1_incomplete}, "
+          f"flagged incomplete: {n_d1_incomplete})")
+    if flagged_dates:
+        print(f"  Flagged-incomplete D1 dates: {flagged_dates}")
+    d1 = d1_full[d1_full["is_complete"]][["open", "high", "low", "close"]]
+    # Re-localize to UTC for compatibility with existing detection code (which uses tz-aware index)
+    d1.index = d1.index.tz_localize("UTC")
+
     h4 = resample_ohlc(m30, "4h", weekday_only=False)  # H4 bars; weekend gaps natural
     m30_full = m30.copy()  # M30 as-is
 
@@ -137,6 +186,12 @@ def main():
             "window_start": str(WIN_START),
             "window_end": str(WIN_END),
             "module": "live/ats_trend_line.py",
+            "d1_resample": "ET session (17:00 ET close, DST-aware)",
+            "d1_sessions_total": n_d1_total,
+            "d1_sessions_flagged_incomplete": n_d1_incomplete,
+            "d1_flagged_dates": flagged_dates,
+            "is_complete_threshold": _COMPLETE_COVERAGE,
+            "expected_m30_bars_per_session": _EXPECTED_M30_PER_SESSION,
         },
         "per_tf": {},
     }
@@ -155,6 +210,13 @@ def main():
         tl_path = OUT_DIR / f"direction_timeline_{label}.csv"
         tl_df.to_csv(tl_path, index=False)
         print(f"  wrote {tl_path}")
+
+        # Save dots CSV (direction-change events) for comparison with disputed-dot audits
+        dots_df = pd.DataFrame(r.get("dots", []))
+        if not dots_df.empty:
+            dots_path = OUT_DIR / f"dots_{label}.csv"
+            dots_df.to_csv(dots_path, index=False)
+            print(f"  wrote {dots_path}")
 
     # Save summary JSON (trim timeline from summary to avoid duplication)
     out_summary = {
