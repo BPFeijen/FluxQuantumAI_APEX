@@ -9,8 +9,12 @@ C:\FluxQuantumAI\live\m30_updater.py
 # by combining historical M1 data with today's live
 # microstructure, then running the M30 box detection
 # state machine in full.
-# Source for today: microstructure_YYYY-MM-DD.csv.gz (mid_price)
+# Source for today: trades_YYYY-MM-DD.csv.gz (executed trade prices)
 # Source for history: gc_ohlcv_l2_joined.parquet
+# DATA-002 P1 fix (2026-04-25): switched OHLC source from
+# microstructure mid_price to trades.price after empirical proof that
+# mid-derived bars under/overshot tape by 30+ pt during fast moves.
+# See _audit/pp_sprint/DATA-002_P1_root_cause_briefback.md
 # Output: gc_m30_boxes.parquet (atomic write)
 # ============================================================
 
@@ -65,35 +69,41 @@ OUTPUT_COLS = [
 # Step 1 -- build combined M1 DataFrame (history + today)
 # ---------------------------------------------------------------------------
 
-def _micro_to_m1(micro_path: Path) -> pd.DataFrame | None:
+def _trades_to_m1(trades_path: Path) -> pd.DataFrame | None:
     """
-    Reconstruct M1 OHLCV from today's live microstructure file.
-    Uses mid_price column (present in microstructure schema since Quantower update).
+    Reconstruct M1 OHLCV from today's executed-trades tape (trades_*.csv.gz).
+    Uses price + size columns of executed trades — authoritative vs the live
+    tape, not a book-midpoint derivative.
+
+    DATA-002 P1 fix (2026-04-25): replaced prior _micro_to_m1 implementation
+    that read microstructure.mid_price. mid-derived OHLC was producing silent
+    corruption during fast moves (parquet under/overshooting trades by up to
+    30+ pt — proven byte-equal pq==mid on 2026-04-07, 2026-03-19, 2026-04-02).
     Returns None if file missing or no usable data.
     """
-    if not micro_path.exists():
-        log.warning("Microstructure not found: %s", micro_path)
+    if not trades_path.exists():
+        log.warning("Trades file not found: %s", trades_path)
         return None
     try:
-        micro = pd.read_csv(
-            micro_path,
-            usecols=["timestamp", "mid_price", "bar_delta"],
-            dtype={"mid_price": "float64", "bar_delta": "float64"},
+        trades = pd.read_csv(
+            trades_path,
+            usecols=["timestamp", "price", "size"],
+            dtype={"price": "float64", "size": "float64"},
         )
-        micro["timestamp"] = pd.to_datetime(micro["timestamp"], utc=True)
-        micro = micro.dropna(subset=["mid_price", "timestamp"])
-        micro = micro.set_index("timestamp").sort_index()
+        trades["timestamp"] = pd.to_datetime(trades["timestamp"], utc=True)
+        trades = trades.dropna(subset=["price", "timestamp"])
+        trades = trades.set_index("timestamp").sort_index()
 
-        if micro.empty:
+        if trades.empty:
             return None
 
-        m1 = micro["mid_price"].resample("1min").ohlc()
+        m1 = trades["price"].resample("1min").ohlc()
         m1.columns = ["open", "high", "low", "close"]
-        m1["volume"] = micro["bar_delta"].abs().resample("1min").sum()
+        m1["volume"] = trades["size"].resample("1min").sum()
         m1 = m1.dropna(subset=["close"])
         return m1
     except Exception as e:
-        log.error("_micro_to_m1 failed: %s", e)
+        log.error("_trades_to_m1 failed: %s", e)
         return None
 
 
@@ -122,9 +132,9 @@ def _build_m1(micro_dir: Path = MICRO_DIR) -> pd.DataFrame:
     while d <= today_date:
         d_str = d.strftime("%Y-%m-%d")
         for suffix in [".csv.gz", ".fixed.csv.gz"]:
-            micro_path = micro_dir / f"microstructure_{d_str}{suffix}"
+            micro_path = micro_dir / f"trades_{d_str}{suffix}"
             if micro_path.exists():
-                m1_day = _micro_to_m1(micro_path)
+                m1_day = _trades_to_m1(micro_path)
                 if m1_day is not None:
                     if m1_day.index.tz is None:
                         m1_day.index = m1_day.index.tz_localize("UTC")
@@ -477,18 +487,20 @@ def start(micro_dir: Path = MICRO_DIR) -> threading.Thread:
         while True:
             time.sleep(60)
 
-            # Feed health check: skip update if microstructure file is stale (>5 min)
+            # Feed health check: skip update if trades file is stale (>5 min)
+            # (DATA-002 P1 fix: switched probe from microstructure_ to trades_
+            # to match the new OHLC source)
             today_str   = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            micro_today = micro_dir / f"microstructure_{today_str}.csv.gz"
+            micro_today = micro_dir / f"trades_{today_str}.csv.gz"
             if micro_today.exists():
                 micro_age = time.time() - micro_today.stat().st_mtime
                 if micro_age > 300:  # 5 min
                     log.warning(
-                        "M30_UPDATE SKIPPED: feed STALE (microstructure age=%.0fs) -- "
+                        "M30_UPDATE SKIPPED: feed STALE (trades age=%.0fs) -- "
                         "check quantower_level2_api (port 8000)", micro_age)
                     continue
             else:
-                log.warning("M30_UPDATE SKIPPED: microstructure file not found for today (%s)", today_str)
+                log.warning("M30_UPDATE SKIPPED: trades file not found for today (%s)", today_str)
                 continue
 
             try:
