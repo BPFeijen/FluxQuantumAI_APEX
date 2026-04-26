@@ -71,14 +71,17 @@ log = logging.getLogger("apex.impl3")
 # ============================================================================
 
 FEATURE_WEIGHTS = {
-    "F5_B": 0.640,
-    "F3_B": 0.543,
-    "F5_A": 0.394,
-    "F2_B": 0.274,
-    "F1_B": 0.213,
+    # Arm D weights per DEC 2026-04-26-002 (FOLLOW-RECALIB-001 apply).
+    # Source: EXEC-8 multi-arm verdict, 90 trades / 3m, +3.27 pts/trade,
+    # +494 pts swing vs PROD baseline.
+    "F5_B": 0.176,
+    "F3_B": 0.220,
+    "F5_A": 0.189,
+    "F2_B": 0.278,
+    "F1_B": 0.196,
 }
 
-EXHAUSTION_SCORE_THRESHOLD = 0.4   # strict >; ties at 0.4 are inactive
+EXHAUSTION_SCORE_THRESHOLD = 0.25   # strict >; Arm D threshold per DEC 2026-04-26-002 (EXEC-8 ultra-fine grid Step 6 confirmed 0.25 optimum)
 
 # Theoretical maxima (informational, not used as gates).
 MAX_POSSIBLE_SCORE = sum(FEATURE_WEIGHTS.values())   # 2.064

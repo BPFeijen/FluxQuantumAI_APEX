@@ -2597,14 +2597,14 @@ class EventProcessor:
         log.debug("CASCADE placeholder: n=%d window=%d (not yet implemented)", _cascade_n, _cascade_window)
 
         # -- PLACEHOLDER: VOL_CLIMAX (CAL-PENDING) ----------------------------
-        # Calibrated: vol_climax_multiplier=0.682, dom_imbalance_threshold=17.03
+        # Calibrated: vol_climax_multiplier=0.68206, dom_imbalance_threshold=17.03
         # (raw bar_delta units -- top 1.2% of flow activity, NOT normalized dom_imbalance)
         # Intent: if current bar_delta exceeds vol_climax_multiplier x rolling_std,
         # the bar is classified as a volume climax -- potential exhaustion signal that
         # ENHANCES reversal entry (aligned with CAL-03 finding: high delta = exhaustion).
         # TODO: compute rolling bar_delta std from df_micro and compare to current bar.
         # Architecture decision: telemetry only, or +1 score bonus in gate?
-        _vol_climax_mult = float(self._thresholds.get("vol_climax_multiplier", 0.682))
+        _vol_climax_mult = float(self._thresholds.get("vol_climax_multiplier", 0.68206))
         _dom_thr_raw     = float(self._thresholds.get("dom_imbalance_threshold", 17.03))
         # bar_delta = self._metrics.get("bar_delta", 0.0)
         # vol_climax_active = abs(bar_delta) > _dom_thr_raw  (raw bar_delta units)
@@ -3286,7 +3286,7 @@ class EventProcessor:
             shadow_signals.append(f"d4h_near_exhaustion={d4h:+.0f} (80% of {exh_low})")
 
         # ── SHADOW 3: vol_climax ──
-        vol_climax_mult = float(tc.get("vol_climax_multiplier", 0.682))
+        vol_climax_mult = float(tc.get("vol_climax_multiplier", 0.68206))
         try:
             if micro_path.exists():
                 if "bar_delta" in _mdf.columns and len(_mdf) > 30:
