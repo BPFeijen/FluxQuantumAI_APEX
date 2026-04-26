@@ -805,3 +805,40 @@ def notify_trade_closed(
         f"\n<i>{datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}</i>"
     )
     _send_async(text)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# P1-TG-NEW (EXEC-2 2026-04-26) — LOGIC-C signals + FEAT-4 vetoes
+# Observable behavior language only (no methodology jargon).
+# ═══════════════════════════════════════════════════════════════════════
+
+def notify_logic_c_signal(score: float, features_active: str,
+                          symbol: str = "XAUUSD", price: float = 0.0):
+    """LOGIC-C composite score crossed threshold. Stub-active until EXEC-5 ships scorer."""
+    text = (
+        f"\U0001F3AF <b>LOGIC-C SIGNAL</b> — Score: {score:.2f} ({features_active}) "
+        f"@ {symbol} {price:.2f}\n"
+        f"\n<i>{datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}</i>"
+    )
+    _send_async(text)
+
+
+def notify_feat4_veto(hook_name: str, position_state, veto_reason: str):
+    """FEAT-4 anti-exit veto fired at a position-monitor hook. Stub-active until EXEC-6 ships."""
+    pos_repr = "?"
+    try:
+        if isinstance(position_state, dict):
+            pos_repr = (
+                f"streak={position_state.get('danger_streak', 0)} "
+                f"shield={position_state.get('shield_done', False)}"
+            )
+        else:
+            pos_repr = str(position_state)[:80]
+    except Exception:
+        pass
+    text = (
+        f"\U0001F6E1 <b>FEAT-4 VETO</b> — {hook_name} skipped — "
+        f"{veto_reason} — Pos: {pos_repr}\n"
+        f"\n<i>{datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}</i>"
+    )
+    _send_async(text)

@@ -1670,6 +1670,21 @@ class EventProcessor:
                              self._regime_state["trend_b"], new_trend_b)
                     self._regime_state["trend_b"] = new_trend_b
 
+                # P1-TG-NEW Site 1 (EXEC-2 2026-04-26): LOGIC-C signal hook.
+                # Stub-active until EXEC-5 ships the IMPL-3 weighted scorer
+                # that populates self._logic_c_score and self._logic_c_features.
+                _logic_c_score = getattr(self, "_logic_c_score", None)
+                if _logic_c_score is not None and _logic_c_score > 0.6:
+                    try:
+                        tg.notify_logic_c_signal(
+                            score=float(_logic_c_score),
+                            features_active=getattr(self, "_logic_c_features", ""),
+                            symbol="XAUUSD",
+                            price=float(self._metrics.get("xau_mid", 0.0) or 0.0),
+                        )
+                    except Exception as _tg_err:
+                        log.debug("notify_logic_c_signal failed: %s", _tg_err)
+
             if reason:
                 log.info(
                     "MACRO_REFRESH[%s]: confirmed_bias=%s provisional_bias=%s confirmed=%s",

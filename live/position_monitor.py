@@ -909,6 +909,21 @@ class PositionMonitor:
         """
         Close Leg 2 + Leg 3 if danger_score >= DANGER_THRESHOLD for DANGER_BARS consecutive bars.
         """
+        # P1-TG-NEW Site 2 (EXEC-2 2026-04-26): FEAT-4 anti-exit veto hook.
+        # Stub-active until EXEC-6 ships veto logic that sets _feat_4_anti_exit_active.
+        _ms = getattr(self, "market_state", None) or getattr(self, "_market_state", None)
+        if _ms is not None and getattr(_ms, "_feat_4_anti_exit_active", False):
+            try:
+                from live import telegram_notifier as _tg
+                _tg.notify_feat4_veto(
+                    hook_name="_check_l2_danger",
+                    position_state=state,
+                    veto_reason=getattr(_ms, "_feat_4_veto_reason", "FEAT-4 anti-exit active"),
+                )
+                return  # Skip exit when veto active
+            except Exception as _tg_err:
+                log.debug("notify_feat4_veto failed: %s", _tg_err)
+
         if df_micro is None:
             return
 
@@ -982,6 +997,21 @@ class PositionMonitor:
         After SHIELD: runner is at breakeven SL, worst outcome is +0.
         Regime flip suppressed post-SHIELD -- trailing stop and cascade manage the runner.
         """
+        # P1-TG-NEW Site 3 (EXEC-2 2026-04-26): FEAT-4 anti-exit veto hook.
+        # Stub-active until EXEC-6 ships veto logic that sets _feat_4_anti_exit_active.
+        _ms = getattr(self, "market_state", None) or getattr(self, "_market_state", None)
+        if _ms is not None and getattr(_ms, "_feat_4_anti_exit_active", False):
+            try:
+                from live import telegram_notifier as _tg
+                _tg.notify_feat4_veto(
+                    hook_name="_check_regime_flip",
+                    position_state=state,
+                    veto_reason=getattr(_ms, "_feat_4_veto_reason", "FEAT-4 anti-exit active"),
+                )
+                return  # Skip exit when veto active
+            except Exception as _tg_err:
+                log.debug("notify_feat4_veto failed: %s", _tg_err)
+
         if state.get("shield_done"):
             return
 
@@ -1305,6 +1335,21 @@ class PositionMonitor:
         If price moves > CASCADE_ATR_FACTOR x ATR against position in CASCADE_WINDOW_S:
         close ALL legs immediately.
         """
+        # P1-TG-NEW Site 4 (EXEC-2 2026-04-26): FEAT-4 anti-exit veto hook.
+        # Stub-active until EXEC-6 ships veto logic that sets _feat_4_anti_exit_active.
+        _ms = getattr(self, "market_state", None) or getattr(self, "_market_state", None)
+        if _ms is not None and getattr(_ms, "_feat_4_anti_exit_active", False):
+            try:
+                from live import telegram_notifier as _tg
+                _tg.notify_feat4_veto(
+                    hook_name="_check_cascade",
+                    position_state=state,
+                    veto_reason=getattr(_ms, "_feat_4_veto_reason", "FEAT-4 anti-exit active"),
+                )
+                return  # Skip exit when veto active
+            except Exception as _tg_err:
+                log.debug("notify_feat4_veto failed: %s", _tg_err)
+
         hist = self._price_history.get(pos["ticket"], [])
         if len(hist) < 2:
             return
@@ -1370,6 +1415,21 @@ class PositionMonitor:
 
         Kill switch: C:/FluxQuantumAI/DISABLE_T3_EXIT file disables regardless of mode.
         """
+        # P1-TG-NEW Site 5 (EXEC-2 2026-04-26): FEAT-4 anti-exit veto hook.
+        # Stub-active until EXEC-6 ships veto logic that sets _feat_4_anti_exit_active.
+        _ms = getattr(self, "market_state", None) or getattr(self, "_market_state", None)
+        if _ms is not None and getattr(_ms, "_feat_4_anti_exit_active", False):
+            try:
+                from live import telegram_notifier as _tg
+                _tg.notify_feat4_veto(
+                    hook_name="_check_t3_defense_exit",
+                    position_state=state,
+                    veto_reason=getattr(_ms, "_feat_4_veto_reason", "FEAT-4 anti-exit active"),
+                )
+                return  # Skip exit when veto active
+            except Exception as _tg_err:
+                log.debug("notify_feat4_veto failed: %s", _tg_err)
+
         if price is None:
             return
 
