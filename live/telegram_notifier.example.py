@@ -809,36 +809,88 @@ def notify_trade_closed(
 
 # ═══════════════════════════════════════════════════════════════════════
 # P1-TG-NEW (EXEC-2 2026-04-26) — LOGIC-C signals + FEAT-4 vetoes
-# Observable behavior language only (no methodology jargon).
+# REVERTED via EXEC-2.5 2026-04-26 to use Annex A acordado templates.
+# Channel context (Contabo today): only "Trading Signals" user-facing exists.
+# 4 additional channels (Trading Diagnostics, Health Status, Health Critical,
+# PnL Summary) only after Phase 0.7 GEX44.
+# Therefore: ZERO methodology jargon allowed in any user-facing message.
+# LOGIC-C → internal log only (no Telegram). User-facing happens via A.1
+#           New Signal when entry decision is final.
+# FEAT-4  → user-facing template A.4 HOLD POSITION (counter-move in absorption).
 # ═══════════════════════════════════════════════════════════════════════
 
-def notify_logic_c_signal(score: float, features_active: str,
-                          symbol: str = "XAUUSD", price: float = 0.0):
-    """LOGIC-C composite score crossed threshold. Stub-active until EXEC-5 ships scorer."""
-    text = (
-        f"\U0001F3AF <b>LOGIC-C SIGNAL</b> — Score: {score:.2f} ({features_active}) "
-        f"@ {symbol} {price:.2f}\n"
-        f"\n<i>{datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}</i>"
-    )
-    _send_async(text)
+def notify_logic_c_signal(score: float, features_active: str, **kwargs):
+    """Internal log only. NO Telegram send.
+
+    LOGIC-C is an internal trigger; not exposed user-facing. When LOGIC-C
+    fires the final entry decision (GO), the existing A.1 New Signal flow
+    sends the user-facing notification via notify_decision().
+
+    Future (post-Phase 0.7 GEX44): if diagnostic visibility is wanted,
+    move to "Trading Diagnostics" channel with format A.6. Not today.
+    """
+    _log.info("LOGIC-C trigger: score=%.2f features=%s", score, features_active)
+    # NO _send_async call. NO Telegram message.
 
 
-def notify_feat4_veto(hook_name: str, position_state, veto_reason: str):
-    """FEAT-4 anti-exit veto fired at a position-monitor hook. Stub-active until EXEC-6 ships."""
-    pos_repr = "?"
+def notify_feat4_veto(
+    signal_id: str,
+    direction: str,
+    entry_price: float,
+    current_price: float,
+    hard_stop: float,
+    observable_patterns,
+    time_limit_min: int = 5,
+):
+    """User-facing HOLD POSITION notification (Annex A template A.4).
+
+    Sent when the system detects a counter-move in absorption and decides
+    to hold the position rather than exit. Vocabulary uses observable
+    behavior language only — no internal naming (no "FEAT-4", no
+    "_check_*", no "veto", no "hook_name").
+
+    observable_patterns: list of up to 3 strings from the acordado
+        vocabulary: 'Spring formation', 'Absorption', 'Bid/Ask absorption',
+        'Delta divergence', 'Liquidity sweep', 'Imbalance'. May be empty
+        when EXEC-6 has not yet wired pattern-detection details.
+    """
+    # Compute unrealized pts directionally
     try:
-        if isinstance(position_state, dict):
-            pos_repr = (
-                f"streak={position_state.get('danger_streak', 0)} "
-                f"shield={position_state.get('shield_done', False)}"
-            )
+        if direction == "LONG":
+            unreal = current_price - entry_price
+            stop_dist = current_price - hard_stop
+        elif direction == "SHORT":
+            unreal = entry_price - current_price
+            stop_dist = hard_stop - current_price
         else:
-            pos_repr = str(position_state)[:80]
+            unreal = 0.0
+            stop_dist = 0.0
     except Exception:
-        pass
+        unreal = 0.0
+        stop_dist = 0.0
+
+    # Format up to 3 observable patterns; graceful degradation if list empty
+    patterns = list(observable_patterns or [])[:3]
+    if patterns:
+        why_hold_lines = "\n".join(f"• {p}" for p in patterns)
+    else:
+        why_hold_lines = "• (pattern detail pending)"
+
     text = (
-        f"\U0001F6E1 <b>FEAT-4 VETO</b> — {hook_name} skipped — "
-        f"{veto_reason} — Pos: {pos_repr}\n"
-        f"\n<i>{datetime.now(timezone.utc).strftime('%H:%M:%S UTC')}</i>"
+        f"\U0001F6E1️ <b>HOLD POSITION</b> — Counter-move in absorption\n"
+        f"Signal: {signal_id}\n"
+        f"Direction: {direction}\n"
+        f"Entry: {entry_price:.2f}\n"
+        f"Current: {current_price:.2f} ({unreal:+.2f} pts unrealized)\n"
+        f"\n"
+        f"Why HOLD:\n"
+        f"{why_hold_lines}\n"
+        f"\n"
+        f"Boundaries:\n"
+        f"• Hard stop: {hard_stop:.2f} ({stop_dist:+.2f} pts) — system will close if breached\n"
+        f"• Time limit: {time_limit_min} min for absorption to complete\n"
+        f"\n"
+        f"Don't close manually. System monitors.\n"
+        f"Time: {datetime.now(timezone.utc).strftime('%H:%M:%S')} UTC"
     )
     _send_async(text)

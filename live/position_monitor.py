@@ -943,12 +943,23 @@ class PositionMonitor:
         if _ms is not None and getattr(_ms, "_feat_4_anti_exit_active", False):
             try:
                 from live import telegram_notifier as _tg
+                # Derive current price from latest df_micro row if available
+                _cur_px = float(pos.get("entry", 0.0))
+                if df_micro is not None and len(df_micro) > 0:
+                    try:
+                        _cur_px = float(df_micro.iloc[-1].get("close", _cur_px))
+                    except Exception:
+                        pass
                 _tg.notify_feat4_veto(
-                    hook_name="_check_l2_danger",
-                    position_state=state,
-                    veto_reason=getattr(_ms, "_feat_4_veto_reason", "FEAT-4 anti-exit active"),
+                    signal_id=str(pos.get("ticket", "?")),
+                    direction=direction,
+                    entry_price=float(pos.get("entry", 0.0)),
+                    current_price=_cur_px,
+                    hard_stop=float(pos.get("sl", 0.0)),
+                    observable_patterns=getattr(_ms, "_feat_4_observed_patterns", []),
+                    time_limit_min=int(getattr(_ms, "_feat_4_time_limit_min", 5)),
                 )
-                return  # Skip exit when veto active
+                return  # Skip exit when hold-position decided
             except Exception as _tg_err:
                 log.debug("notify_feat4_veto failed: %s", _tg_err)
 
@@ -1032,11 +1043,15 @@ class PositionMonitor:
             try:
                 from live import telegram_notifier as _tg
                 _tg.notify_feat4_veto(
-                    hook_name="_check_regime_flip",
-                    position_state=state,
-                    veto_reason=getattr(_ms, "_feat_4_veto_reason", "FEAT-4 anti-exit active"),
+                    signal_id=str(pos.get("ticket", "?")),
+                    direction=direction,
+                    entry_price=float(pos.get("entry", 0.0)),
+                    current_price=float(price if price is not None else pos.get("entry", 0.0)),
+                    hard_stop=float(pos.get("sl", 0.0)),
+                    observable_patterns=getattr(_ms, "_feat_4_observed_patterns", []),
+                    time_limit_min=int(getattr(_ms, "_feat_4_time_limit_min", 5)),
                 )
-                return  # Skip exit when veto active
+                return  # Skip exit when hold-position decided
             except Exception as _tg_err:
                 log.debug("notify_feat4_veto failed: %s", _tg_err)
 
@@ -1369,12 +1384,19 @@ class PositionMonitor:
         if _ms is not None and getattr(_ms, "_feat_4_anti_exit_active", False):
             try:
                 from live import telegram_notifier as _tg
+                # Latest price from per-ticket price history (cascade context)
+                _hist = self._price_history.get(pos.get("ticket"), [])
+                _cur_px = float(_hist[-1][1]) if _hist else float(pos.get("entry", 0.0))
                 _tg.notify_feat4_veto(
-                    hook_name="_check_cascade",
-                    position_state=state,
-                    veto_reason=getattr(_ms, "_feat_4_veto_reason", "FEAT-4 anti-exit active"),
+                    signal_id=str(pos.get("ticket", "?")),
+                    direction=direction,
+                    entry_price=float(pos.get("entry", 0.0)),
+                    current_price=_cur_px,
+                    hard_stop=float(pos.get("sl", 0.0)),
+                    observable_patterns=getattr(_ms, "_feat_4_observed_patterns", []),
+                    time_limit_min=int(getattr(_ms, "_feat_4_time_limit_min", 5)),
                 )
-                return  # Skip exit when veto active
+                return  # Skip exit when hold-position decided
             except Exception as _tg_err:
                 log.debug("notify_feat4_veto failed: %s", _tg_err)
 
@@ -1450,11 +1472,15 @@ class PositionMonitor:
             try:
                 from live import telegram_notifier as _tg
                 _tg.notify_feat4_veto(
-                    hook_name="_check_t3_defense_exit",
-                    position_state=state,
-                    veto_reason=getattr(_ms, "_feat_4_veto_reason", "FEAT-4 anti-exit active"),
+                    signal_id=str(pos.get("ticket", "?")),
+                    direction=direction,
+                    entry_price=float(pos.get("entry", 0.0)),
+                    current_price=float(price if price is not None else pos.get("entry", 0.0)),
+                    hard_stop=float(pos.get("sl", 0.0)),
+                    observable_patterns=getattr(_ms, "_feat_4_observed_patterns", []),
+                    time_limit_min=int(getattr(_ms, "_feat_4_time_limit_min", 5)),
                 )
-                return  # Skip exit when veto active
+                return  # Skip exit when hold-position decided
             except Exception as _tg_err:
                 log.debug("notify_feat4_veto failed: %s", _tg_err)
 
