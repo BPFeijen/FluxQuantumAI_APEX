@@ -103,6 +103,8 @@ SOT_N = 3                          # minimum 3 pushes for SOT (Wyckoff §1.6)
 EFR_ROLLING = 100                  # 100-bar trailing window for EFR pct rank
 EFR_DIVERGENCE_THRESHOLD = 0.3     # vol_pct - body_pct gap threshold
 CLOSE_PCT_WEAK = 0.3               # weak-close threshold for F5
+VOL_CLIMAX_PCT = 95                # F4 percentile threshold (Wyckoff Phase D)
+VOL_CLIMAX_WINDOW = 100            # rolling window for F4 quantile
 
 # Default neutral state when the module's evaluate_all() fails entirely.
 NEUTRAL_FEATURE_STATE = {
@@ -323,6 +325,51 @@ def feature_F5_B(df: pd.DataFrame, regime_state: dict) -> bool:
     if tdir == 0:
         return False
     return _close_pct_active(df.iloc[-1], tdir)
+
+
+# ============================================================================
+# F4 — Volume Climax × TREND-A (FEAT-4 anti-exit hook, EXEC-6 IMPL-4)
+# ============================================================================
+
+def feature_F4(df: pd.DataFrame, regime_state: dict) -> bool:
+    """Active when TREND-A holds AND the latest M30 bar's volume exceeds
+    the 95th percentile of the trailing 100-bar window (Volume Climax).
+
+    Wyckoff Phase D event: a Volume Climax marks the institutional-driven
+    transfer that closes the absorption phase and opens the markup /
+    markdown phase. Per Villahermosa "Wyckoff 2.0" Book 2 §4.2.4
+    (volume climax during exhaustion) and Forthmann "Volume Profile /
+    Market Profile / Order Flow" — the climax is a discrete event that
+    invalidates many *premature* defensive exits (i.e. the move that
+    triggered the defensive check is the climax itself, not the start
+    of a reversal).
+
+    Used by EXEC-6 IMPL-4 anti-exit veto (NOT in LOGIC-C scorer — see
+    T1-X1-INTERACTIONS_v2.md §14.3 gotcha 5: "VolClimax (FEAT-4) is NOT
+    in LOGIC-C; it's only for the INT-6 anti-exit use case").
+
+    Constants frozen (T1-X1-FEATURES §76): VOL_CLIMAX_PCT=95,
+    VOL_CLIMAX_WINDOW=100, warm-up min(20, window//5).
+
+    Returns False when:
+      - TREND-A is inactive
+      - df has < warm-up minimum bars
+      - latest volume is missing / NaN
+    """
+    trend_a_active, _trend_a_dir = regime_state.get("trend_a", (False, ""))
+    if not trend_a_active:
+        return False
+    if df is None or len(df) < max(20, VOL_CLIMAX_WINDOW // 5):
+        return False
+    if "volume" not in df.columns:
+        return False
+    vol_series = df["volume"].dropna()
+    if len(vol_series) < max(20, VOL_CLIMAX_WINDOW // 5):
+        return False
+    window = vol_series.iloc[-VOL_CLIMAX_WINDOW:] if len(vol_series) >= VOL_CLIMAX_WINDOW else vol_series
+    last_vol = float(vol_series.iloc[-1])
+    p95 = float(window.quantile(VOL_CLIMAX_PCT / 100.0))
+    return bool(last_vol > p95)
 
 
 # ============================================================================

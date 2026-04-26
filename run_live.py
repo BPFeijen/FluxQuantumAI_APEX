@@ -817,6 +817,17 @@ def _run_event_driven(args) -> None:
         daily_trend  = levels.get("daily_trend", "unknown"),
     )
 
+    # --- IMPL-4 IPC injection (EXEC-6 2026-04-26) ---
+    # Wire MarketEventProcessor into PositionMonitor so the four
+    # defensive-exit hooks can read FEAT-4 anti-exit state. Order matters:
+    # PositionMonitor was constructed at line 793-799 BEFORE EventProcessor;
+    # this is the post-hoc injection that completes the IPC contract.
+    if 'monitor' in dir() and monitor is not None:
+        try:
+            monitor.set_market_state(processor)
+        except Exception as _ipc_err:
+            print(_color(f"WARNING: monitor.set_market_state failed: {_ipc_err}", _YELLOW))
+
     # --- Initialize M30 bias immediately (don't wait for first refresh cycle) ---
     # Without this, gates have no data for the first ~15-75s after startup.
     processor.m30_bias       = levels.get("m30_bias", "unknown")

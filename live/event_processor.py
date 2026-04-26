@@ -511,6 +511,15 @@ class EventProcessor:
         self._logic_c_score    = 0.0
         self._logic_c_features = ""
         self._logic_c_signal   = False
+        # IMPL-4 (EXEC-6 2026-04-26): FEAT-4 Volume Climax × TREND-A
+        # anti-exit veto IPC shared state. event_processor WRITES; the
+        # PositionMonitor (via market_state.set_market_state injection)
+        # READS at each defensive-exit hook (l2_danger / regime_flip /
+        # cascade / t3_defense_exit). When active AND position is in
+        # profit, the hook skips the defensive close.
+        self._feat_4_anti_exit_active = False
+        self._feat_4_observed_patterns = []   # for Telegram A.4 HOLD body
+        self._feat_4_time_limit_min   = 5     # default hold window (min)
         # --------------------------------------------------------------------
 
         self.dry_run      = dry_run
@@ -1712,6 +1721,37 @@ class EventProcessor:
                     self._logic_c_score = 0.0
                     self._logic_c_features = ""
                     self._logic_c_signal = False
+
+                # --- IMPL-4 (EXEC-6 2026-04-26): FEAT-4 Volume Climax × TREND-A ---
+                # Anti-exit veto. Wyckoff Phase D climax event (Villahermosa
+                # §4.2.4). When active AND a defensive-exit hook fires AND the
+                # position is in profit, the hook holds rather than exits.
+                # IPC contract: this attribute is read by PositionMonitor via
+                # market_state injection (see PositionMonitor.set_market_state).
+                try:
+                    from live.impl2_features import feature_F4 as _impl4_eval
+                    _f4_active = bool(_impl4_eval(df, self._regime_state))
+                    self._feat_4_anti_exit_active = _f4_active
+                    if _f4_active:
+                        # Build observable patterns list for Telegram A.4 template.
+                        # Volume Climax is the primary pattern; enrich with any
+                        # LOGIC-C features active to give human-readable context.
+                        _patterns = ["Volume climax in trend (institutional absorption)"]
+                        if self._feature_state.get("F5_B") or self._feature_state.get("F5_A"):
+                            _patterns.append("Weak close vs bar range")
+                        if self._feature_state.get("F3_B"):
+                            _patterns.append("Delta divergence vs candle body")
+                        if self._feature_state.get("F1_B"):
+                            _patterns.append("Bar range shortening (3-bar)")
+                        self._feat_4_observed_patterns = _patterns[:3]
+                        log.info("FEAT-4: anti-exit ACTIVE — patterns=%s",
+                                 self._feat_4_observed_patterns)
+                    else:
+                        self._feat_4_observed_patterns = []
+                except Exception as _f4_err:
+                    log.debug("FEAT-4 evaluation failed: %s", _f4_err)
+                    self._feat_4_anti_exit_active = False
+                    self._feat_4_observed_patterns = []
 
                 # P1-TG-NEW Site 1 (EXEC-2 2026-04-26, threshold updated EXEC-5):
                 # LOGIC-C signal Telegram hook. Threshold imported from impl3

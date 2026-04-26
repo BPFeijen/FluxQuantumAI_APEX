@@ -470,6 +470,124 @@ class PositionMonitor:
     # Public interface
     # ------------------------------------------------------------------
 
+    def set_market_state(self, market_state) -> None:
+        """IMPL-4 IPC contract (EXEC-6 2026-04-26).
+
+        Inject the live MarketEventProcessor instance so the four
+        defensive-exit hooks can read FEAT-4 anti-exit state via
+        self.market_state._feat_4_anti_exit_active. Called once from
+        run_live.py after both PositionMonitor and EventProcessor are
+        constructed (PositionMonitor is built first; EventProcessor
+        comes later, so injection has to happen post-hoc).
+
+        Idempotent — safe to call multiple times.
+        """
+        self.market_state = market_state
+        log.info("PositionMonitor: market_state injected for FEAT-4 IPC")
+
+    def _fire_feat4_veto(
+        self,
+        hook_name: str,
+        pos: dict,
+        direction: str,
+        current_price: float,
+    ) -> bool:
+        """IMPL-4 anti-exit veto (EXEC-6 2026-04-26).
+
+        Single decision point invoked at every defensive-exit hook
+        (l2_danger / regime_flip / cascade / t3_defense_exit). Returns
+        True iff the veto fired and the caller MUST skip its exit.
+
+        Veto fires only when ALL of the following hold:
+          1. market_state has been injected (set_market_state called)
+          2. market_state._feat_4_anti_exit_active is True (FEAT-4
+             Volume Climax × TREND-A — see live/impl2_features.py
+             feature_F4 + Wyckoff Phase D citation)
+          3. Position is in profit (don't hold a loser through climax)
+
+        Side effects when veto fires:
+          - Writes a FEAT_4_VETO event to position_events.jsonl
+            (stream restored by EXEC-3 P1-POS-LOG)
+          - Sends an A.4 HOLD POSITION Telegram message
+            (template per EXEC-2.5; observable_patterns + time_limit_min
+            taken from market_state)
+          - Logs an audit line at INFO level
+
+        Caller pattern at each hook:
+            if self._fire_feat4_veto("<hook_name>", pos, direction, _cur_px):
+                return     # skip the defensive exit
+        """
+        _ms = getattr(self, "market_state", None) or getattr(self, "_market_state", None)
+        if _ms is None or not getattr(_ms, "_feat_4_anti_exit_active", False):
+            return False
+
+        try:
+            entry = float(pos.get("entry", 0.0))
+            cur_px = float(current_price)
+            in_profit = (
+                (direction == "LONG"  and cur_px > entry) or
+                (direction == "SHORT" and cur_px < entry)
+            )
+            if not in_profit:
+                # FEAT-4 active but position underwater — DO NOT veto.
+                # (Only protects in-profit runners from being stopped out
+                # by transient defensive checks during the climax bar.)
+                log.info("FEAT-4 active but ticket=%s %s underwater (entry=%.2f cur=%.2f) — exit allowed",
+                         pos.get("ticket"), direction, entry, cur_px)
+                return False
+
+            unreal = (cur_px - entry) if direction == "LONG" else (entry - cur_px)
+            patterns = list(getattr(_ms, "_feat_4_observed_patterns", []) or [])
+            time_limit = int(getattr(_ms, "_feat_4_time_limit_min", 5))
+
+            # 1) audit log
+            log.info(
+                "FEAT-4 VETO: hook=%s ticket=%s dir=%s entry=%.2f cur=%.2f unreal=%+.2fpts patterns=%s",
+                hook_name, pos.get("ticket"), direction, entry, cur_px, unreal, patterns,
+            )
+
+            # 2) position_events.jsonl write (EXEC-3 stream)
+            try:
+                import json as _json_v
+                import datetime as _dt_v
+                _evt = {
+                    "timestamp": _dt_v.datetime.now(_dt_v.timezone.utc).isoformat(),
+                    "event_type": "FEAT_4_VETO",
+                    "hook": hook_name,
+                    "ticket": pos.get("ticket"),
+                    "direction": direction,
+                    "entry_price": entry,
+                    "current_price": cur_px,
+                    "unrealized_pts": float(unreal),
+                    "hard_stop": float(pos.get("sl", 0.0)),
+                    "patterns": patterns,
+                    "time_limit_min": time_limit,
+                }
+                with open(POSITION_EVENTS_LOG, "a", encoding="utf-8") as _vfh:
+                    _vfh.write(_json_v.dumps(_evt, default=str) + "\n")
+            except Exception as _vlog_err:
+                log.debug("FEAT-4 veto position_events.jsonl write failed: %s", _vlog_err)
+
+            # 3) Telegram A.4 HOLD POSITION (template from EXEC-2.5)
+            try:
+                from live import telegram_notifier as _tg
+                _tg.notify_feat4_veto(
+                    signal_id=str(pos.get("ticket", "?")),
+                    direction=direction,
+                    entry_price=entry,
+                    current_price=cur_px,
+                    hard_stop=float(pos.get("sl", 0.0)),
+                    observable_patterns=patterns,
+                    time_limit_min=time_limit,
+                )
+            except Exception as _tg_err:
+                log.debug("notify_feat4_veto failed: %s", _tg_err)
+
+            return True
+        except Exception as _veto_err:
+            log.debug("FEAT-4 veto evaluation failed at hook=%s: %s", hook_name, _veto_err)
+            return False
+
     def start(self) -> None:
         """Start the monitor in a background daemon thread."""
         self._running = True
@@ -937,31 +1055,17 @@ class PositionMonitor:
         """
         Close Leg 2 + Leg 3 if danger_score >= DANGER_THRESHOLD for DANGER_BARS consecutive bars.
         """
-        # P1-TG-NEW Site 2 (EXEC-2 2026-04-26): FEAT-4 anti-exit veto hook.
-        # Stub-active until EXEC-6 ships veto logic that sets _feat_4_anti_exit_active.
-        _ms = getattr(self, "market_state", None) or getattr(self, "_market_state", None)
-        if _ms is not None and getattr(_ms, "_feat_4_anti_exit_active", False):
+        # IMPL-4 (EXEC-6 2026-04-26): FEAT-4 anti-exit veto.
+        # Helper handles market_state lookup, in-profit check, jsonl write,
+        # Telegram A.4 HOLD, and audit log. Returns True iff veto fired.
+        _cur_px_v = float(pos.get("entry", 0.0))
+        if df_micro is not None and len(df_micro) > 0:
             try:
-                from live import telegram_notifier as _tg
-                # Derive current price from latest df_micro row if available
-                _cur_px = float(pos.get("entry", 0.0))
-                if df_micro is not None and len(df_micro) > 0:
-                    try:
-                        _cur_px = float(df_micro.iloc[-1].get("close", _cur_px))
-                    except Exception:
-                        pass
-                _tg.notify_feat4_veto(
-                    signal_id=str(pos.get("ticket", "?")),
-                    direction=direction,
-                    entry_price=float(pos.get("entry", 0.0)),
-                    current_price=_cur_px,
-                    hard_stop=float(pos.get("sl", 0.0)),
-                    observable_patterns=getattr(_ms, "_feat_4_observed_patterns", []),
-                    time_limit_min=int(getattr(_ms, "_feat_4_time_limit_min", 5)),
-                )
-                return  # Skip exit when hold-position decided
-            except Exception as _tg_err:
-                log.debug("notify_feat4_veto failed: %s", _tg_err)
+                _cur_px_v = float(df_micro.iloc[-1].get("close", _cur_px_v))
+            except Exception:
+                pass
+        if self._fire_feat4_veto("_check_l2_danger", pos, direction, _cur_px_v):
+            return  # veto fired — skip defensive L2-danger exit
 
         if df_micro is None:
             return
@@ -1036,24 +1140,10 @@ class PositionMonitor:
         After SHIELD: runner is at breakeven SL, worst outcome is +0.
         Regime flip suppressed post-SHIELD -- trailing stop and cascade manage the runner.
         """
-        # P1-TG-NEW Site 3 (EXEC-2 2026-04-26): FEAT-4 anti-exit veto hook.
-        # Stub-active until EXEC-6 ships veto logic that sets _feat_4_anti_exit_active.
-        _ms = getattr(self, "market_state", None) or getattr(self, "_market_state", None)
-        if _ms is not None and getattr(_ms, "_feat_4_anti_exit_active", False):
-            try:
-                from live import telegram_notifier as _tg
-                _tg.notify_feat4_veto(
-                    signal_id=str(pos.get("ticket", "?")),
-                    direction=direction,
-                    entry_price=float(pos.get("entry", 0.0)),
-                    current_price=float(price if price is not None else pos.get("entry", 0.0)),
-                    hard_stop=float(pos.get("sl", 0.0)),
-                    observable_patterns=getattr(_ms, "_feat_4_observed_patterns", []),
-                    time_limit_min=int(getattr(_ms, "_feat_4_time_limit_min", 5)),
-                )
-                return  # Skip exit when hold-position decided
-            except Exception as _tg_err:
-                log.debug("notify_feat4_veto failed: %s", _tg_err)
+        # IMPL-4 (EXEC-6 2026-04-26): FEAT-4 anti-exit veto.
+        _cur_px_v = float(price if price is not None else pos.get("entry", 0.0))
+        if self._fire_feat4_veto("_check_regime_flip", pos, direction, _cur_px_v):
+            return  # veto fired — skip regime-flip exit
 
         if state.get("shield_done"):
             return
@@ -1378,27 +1468,11 @@ class PositionMonitor:
         If price moves > CASCADE_ATR_FACTOR x ATR against position in CASCADE_WINDOW_S:
         close ALL legs immediately.
         """
-        # P1-TG-NEW Site 4 (EXEC-2 2026-04-26): FEAT-4 anti-exit veto hook.
-        # Stub-active until EXEC-6 ships veto logic that sets _feat_4_anti_exit_active.
-        _ms = getattr(self, "market_state", None) or getattr(self, "_market_state", None)
-        if _ms is not None and getattr(_ms, "_feat_4_anti_exit_active", False):
-            try:
-                from live import telegram_notifier as _tg
-                # Latest price from per-ticket price history (cascade context)
-                _hist = self._price_history.get(pos.get("ticket"), [])
-                _cur_px = float(_hist[-1][1]) if _hist else float(pos.get("entry", 0.0))
-                _tg.notify_feat4_veto(
-                    signal_id=str(pos.get("ticket", "?")),
-                    direction=direction,
-                    entry_price=float(pos.get("entry", 0.0)),
-                    current_price=_cur_px,
-                    hard_stop=float(pos.get("sl", 0.0)),
-                    observable_patterns=getattr(_ms, "_feat_4_observed_patterns", []),
-                    time_limit_min=int(getattr(_ms, "_feat_4_time_limit_min", 5)),
-                )
-                return  # Skip exit when hold-position decided
-            except Exception as _tg_err:
-                log.debug("notify_feat4_veto failed: %s", _tg_err)
+        # IMPL-4 (EXEC-6 2026-04-26): FEAT-4 anti-exit veto.
+        _hist_v = self._price_history.get(pos.get("ticket"), [])
+        _cur_px_v = float(_hist_v[-1][1]) if _hist_v else float(pos.get("entry", 0.0))
+        if self._fire_feat4_veto("_check_cascade", pos, direction, _cur_px_v):
+            return  # veto fired — skip cascade exit
 
         hist = self._price_history.get(pos["ticket"], [])
         if len(hist) < 2:
@@ -1465,24 +1539,10 @@ class PositionMonitor:
 
         Kill switch: C:/FluxQuantumAI/DISABLE_T3_EXIT file disables regardless of mode.
         """
-        # P1-TG-NEW Site 5 (EXEC-2 2026-04-26): FEAT-4 anti-exit veto hook.
-        # Stub-active until EXEC-6 ships veto logic that sets _feat_4_anti_exit_active.
-        _ms = getattr(self, "market_state", None) or getattr(self, "_market_state", None)
-        if _ms is not None and getattr(_ms, "_feat_4_anti_exit_active", False):
-            try:
-                from live import telegram_notifier as _tg
-                _tg.notify_feat4_veto(
-                    signal_id=str(pos.get("ticket", "?")),
-                    direction=direction,
-                    entry_price=float(pos.get("entry", 0.0)),
-                    current_price=float(price if price is not None else pos.get("entry", 0.0)),
-                    hard_stop=float(pos.get("sl", 0.0)),
-                    observable_patterns=getattr(_ms, "_feat_4_observed_patterns", []),
-                    time_limit_min=int(getattr(_ms, "_feat_4_time_limit_min", 5)),
-                )
-                return  # Skip exit when hold-position decided
-            except Exception as _tg_err:
-                log.debug("notify_feat4_veto failed: %s", _tg_err)
+        # IMPL-4 (EXEC-6 2026-04-26): FEAT-4 anti-exit veto.
+        _cur_px_v = float(price if price is not None else pos.get("entry", 0.0))
+        if self._fire_feat4_veto("_check_t3_defense_exit", pos, direction, _cur_px_v):
+            return  # veto fired — skip T3 defense exit
 
         if price is None:
             return

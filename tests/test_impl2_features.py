@@ -28,9 +28,11 @@ from live.impl2_features import (
     feature_F3_B,
     feature_F5_A,
     feature_F5_B,
+    feature_F4,
     evaluate_all,
     NEUTRAL_FEATURE_STATE,
     EFR_ROLLING,
+    VOL_CLIMAX_WINDOW,
 )
 
 
@@ -212,6 +214,41 @@ def test_F5_B_direction_fallback_when_dir_str_empty():
 
 
 # ============================================================================
+# F4 Volume Climax × TREND-A — anti-exit feature (EXEC-6 IMPL-4)
+# ============================================================================
+
+def test_F4_positive_climax_and_trend_a():
+    df = _baseline_df(n=VOL_CLIMAX_WINDOW + 10).copy()
+    # Last bar has volume far above any in window → > p95
+    df.iloc[-1, df.columns.get_loc("volume")] = 100_000.0
+    assert feature_F4(df, _regime(trend_a=(True, "LONG"))) is True
+
+
+def test_F4_negative_no_trend_a():
+    df = _baseline_df(n=VOL_CLIMAX_WINDOW + 10).copy()
+    df.iloc[-1, df.columns.get_loc("volume")] = 100_000.0
+    assert feature_F4(df, _regime(trend_a=(False, ""))) is False
+
+
+def test_F4_negative_volume_within_normal_range():
+    df = _baseline_df(n=VOL_CLIMAX_WINDOW + 10).copy()
+    # All volumes constant 100 → last is NOT > p95
+    assert feature_F4(df, _regime(trend_a=(True, "LONG"))) is False
+
+
+def test_F4_warmup_insufficient():
+    df = _baseline_df(n=10).copy()  # below warm-up of 20
+    df.iloc[-1, df.columns.get_loc("volume")] = 100_000.0
+    assert feature_F4(df, _regime(trend_a=(True, "LONG"))) is False
+
+
+def test_F4_missing_volume_column():
+    df = _baseline_df(n=VOL_CLIMAX_WINDOW + 10).copy()
+    df = df.drop(columns=["volume"])
+    assert feature_F4(df, _regime(trend_a=(True, "LONG"))) is False
+
+
+# ============================================================================
 # evaluate_all wrapper — fail-soft + stable schema
 # ============================================================================
 
@@ -258,6 +295,12 @@ if __name__ == "__main__":
         test_F5_B_positive_short_weak_close,
         test_F5_B_negative_no_trend_b,
         test_F5_B_direction_fallback_when_dir_str_empty,
+        # F4 Volume Climax (EXEC-6 IMPL-4)
+        test_F4_positive_climax_and_trend_a,
+        test_F4_negative_no_trend_a,
+        test_F4_negative_volume_within_normal_range,
+        test_F4_warmup_insufficient,
+        test_F4_missing_volume_column,
         # evaluate_all
         test_evaluate_all_returns_complete_schema_for_empty_df,
         test_evaluate_all_returns_complete_schema_for_none_df,
