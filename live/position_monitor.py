@@ -631,8 +631,42 @@ class PositionMonitor:
             if remaining > 0:
                 time.sleep(remaining)
 
+    def _get_positions_safe(self) -> list:
+        """Defensive boundary around executor.get_open_positions().
+
+        Returns [] on any MT5 exception so the monitor loop keeps polling
+        when the broker is disconnected. PM-DECOUPLE-PHASE3 (Asana
+        1214284177814516): replaces the previous direct call which would
+        propagate MT5 failures and silently halt the loop after the
+        `if not positions: return` short-circuit.
+        """
+        try:
+            return self.executor.get_open_positions() or []
+        except Exception as e:
+            log.debug("_get_positions_safe: MT5 exception swallowed: %s", e)
+            return []
+
+    def _evaluate_market_phase_a(self) -> None:
+        """Phase A — Always-on market evaluation (placeholder).
+
+        PM-DECOUPLE-PHASE3 (Asana 1214284177814516): empty by design.
+        Runs every MONITOR_INTERVAL_S regardless of MT5 state or position
+        presence. Phase 1+2 of the decoupling plan (advisory emission to
+        JSONL + Telegram routing) will populate this method as a separate
+        scoping decision; this method exists now only to make the
+        always-on slot explicit and reserve it.
+        """
+        return
+
     def _run_checks(self) -> None:
-        positions = self.executor.get_open_positions()
+        # ── Phase A — Always-on market evaluation ─────────────────────────
+        # Runs every 2s regardless of MT5 connection state or position
+        # presence. Currently no-op (placeholder); Phase 1+2 will add
+        # advisory emission here per separate scoping decision.
+        self._evaluate_market_phase_a()
+
+        # ── Phase B — Position management (MT5-gated) ─────────────────────
+        positions = self._get_positions_safe()
 
         # === Fase 3 Scope B.1 — MT5 history check (detect closed positions) ===
         try:
