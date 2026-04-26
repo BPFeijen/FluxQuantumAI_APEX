@@ -499,6 +499,11 @@ class EventProcessor:
         # index [0] = is_active (bool); index [1] = direction ("LONG"|"SHORT"|"").
         # Consumed by IMPL-2 features and IMPL-3 LOGIC-C scorer.
         self._regime_state = {"trend_a": (False, ""), "trend_b": (False, "")}
+        # IMPL-2 (EXEC-4 2026-04-26): five Wyckoff-grounded exhaustion features.
+        # Updated each macro_context refresh from live/impl2_features.py.
+        # Consumed by IMPL-3 LOGIC-C scorer (EXEC-5).
+        self._feature_state = {"F1_B": False, "F2_B": False, "F3_B": False,
+                               "F5_A": False, "F5_B": False}
         # --------------------------------------------------------------------
 
         self.dry_run      = dry_run
@@ -1669,6 +1674,18 @@ class EventProcessor:
                     log.info("TREND-B state change: %s -> %s",
                              self._regime_state["trend_b"], new_trend_b)
                     self._regime_state["trend_b"] = new_trend_b
+
+                # --- IMPL-2 (EXEC-4 2026-04-26): 5 Wyckoff feature detectors ---
+                # F1_B SOT, F2_B EFR, F3_B Delta Divergence, F5_A ClosePct,
+                # F5_B ClosePct. Read-only — populated for IMPL-3 (EXEC-5)
+                # LOGIC-C scorer to consume. See live/impl2_features.py for
+                # methodology citations (Villahermosa Wyckoff 2.0 §1.6 / §4.5.2
+                # / §4.5.3 + Modules 1-5 Order Flow).
+                try:
+                    from live.impl2_features import evaluate_all as _impl2_eval
+                    self._feature_state = _impl2_eval(df, self._regime_state)
+                except Exception as _impl2_err:
+                    log.debug("IMPL-2 feature evaluation failed: %s", _impl2_err)
 
                 # P1-TG-NEW Site 1 (EXEC-2 2026-04-26): LOGIC-C signal hook.
                 # Stub-active until EXEC-5 ships the IMPL-3 weighted scorer
