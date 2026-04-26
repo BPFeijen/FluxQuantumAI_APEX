@@ -504,6 +504,13 @@ class EventProcessor:
         # Consumed by IMPL-3 LOGIC-C scorer (EXEC-5).
         self._feature_state = {"F1_B": False, "F2_B": False, "F3_B": False,
                                "F5_A": False, "F5_B": False}
+        # IMPL-3 (EXEC-5 2026-04-26): LOGIC-C convergent-evidence verdict.
+        # Updated each macro_context refresh from live/impl3_logic_c.py.
+        # Consumed by _detect_local_exhaustion as the new ACTIVE 1 gate
+        # (overextension demoted to SHADOW per DEC-2026-04-?? EXEC-5).
+        self._logic_c_score    = 0.0
+        self._logic_c_features = ""
+        self._logic_c_signal   = False
         # --------------------------------------------------------------------
 
         self.dry_run      = dry_run
@@ -1687,15 +1694,36 @@ class EventProcessor:
                 except Exception as _impl2_err:
                     log.debug("IMPL-2 feature evaluation failed: %s", _impl2_err)
 
-                # P1-TG-NEW Site 1 (EXEC-2 2026-04-26): LOGIC-C signal hook.
-                # Stub-active until EXEC-5 ships the IMPL-3 weighted scorer
-                # that populates self._logic_c_score and self._logic_c_features.
-                _logic_c_score = getattr(self, "_logic_c_score", None)
-                if _logic_c_score is not None and _logic_c_score > 0.6:
+                # --- IMPL-3 (EXEC-5 2026-04-26): LOGIC-C convergent-evidence scorer ---
+                # Aggregates self._feature_state into a single weighted score and
+                # threshold verdict. Wyckoff Law 1 (Supply/Demand validation) per
+                # Villahermosa "Wyckoff 2.0" Book 2. See live/impl3_logic_c.py.
+                try:
+                    from live.impl3_logic_c import is_exhaustion_signal as _logic_c_eval
+                    _is_exh, _lc_score, _lc_active = _logic_c_eval(self._feature_state)
+                    self._logic_c_score = _lc_score
+                    self._logic_c_features = "+".join(_lc_active) if _lc_active else ""
+                    self._logic_c_signal = bool(_is_exh)
+                    if _is_exh:
+                        log.info("LOGIC-C: score=%.3f thr=0.400 active=%s verdict=EXHAUSTION",
+                                 _lc_score, self._logic_c_features)
+                except Exception as _logic_c_err:
+                    log.debug("LOGIC-C scoring failed: %s", _logic_c_err)
+                    self._logic_c_score = 0.0
+                    self._logic_c_features = ""
+                    self._logic_c_signal = False
+
+                # P1-TG-NEW Site 1 (EXEC-2 2026-04-26, threshold updated EXEC-5):
+                # LOGIC-C signal Telegram hook. Threshold imported from impl3
+                # module (EXHAUSTION_SCORE_THRESHOLD = 0.4 strict).
+                # Note: notify_logic_c_signal is INTERNAL LOG ONLY post-EXEC-2.5
+                # (no Telegram send today; Phase 0.7 GEX44 routes to Trading
+                # Diagnostics channel with format A.6).
+                if self._logic_c_signal:
                     try:
                         tg.notify_logic_c_signal(
-                            score=float(_logic_c_score),
-                            features_active=getattr(self, "_logic_c_features", ""),
+                            score=float(self._logic_c_score),
+                            features_active=self._logic_c_features,
                             symbol="XAUUSD",
                             price=float(self._metrics.get("xau_mid", 0.0) or 0.0),
                         )
@@ -3108,17 +3136,26 @@ class EventProcessor:
     def _detect_local_exhaustion(self, direction: str, decision=None) -> tuple:
         """
         Detect if the recent move is too exhausted for a continuation entry.
-        Sprint 9 v1: conservative filter using only robust, known signals.
+
+        EXEC-5 (2026-04-26) replacement: LOGIC-C convergent-evidence scorer
+        (live/impl3_logic_c.py) is now ACTIVE 1. Overextension is demoted
+        to SHADOW (computed + logged but does NOT block); kept as a
+        diagnostic during the LOGIC-C calibration period. Strategy-selector
+        overextension at _pick_strategy_direction is UNTOUCHED (memory
+        feedback_strategy_selector_inputs: "Rules são INPUTS do Selector").
 
         ACTIVE (block):
-          1. overextension_atr_mult — price too far from liq zone
+          1. LOGIC-C exhaustion (Wyckoff Law 1 convergent evidence,
+             threshold 0.4 strict — see live/impl3_logic_c.py)
           2. impulse_30min — explosive bar against entry (from V3 momentum)
           3. iceberg contra forte — strong institutional contra signal
 
-        SHADOW (log only, for future calibration):
-          1. delta_weakening
-          2. delta_4h_exhaustion as local contributor
-          3. vol_climax
+        SHADOW (log only):
+          1. overextension_atr_mult — price too far from liq zone
+             (was ACTIVE pre-EXEC-5; demoted 2026-04-26)
+          2. delta_weakening
+          3. delta_4h_exhaustion as local contributor
+          4. vol_climax
 
         Returns:
             (exhausted: bool, reason: str)
@@ -3128,17 +3165,42 @@ class EventProcessor:
         xau_price = self._metrics.get("xau_mid", 0.0)
         shadow_signals = []
 
-        # ── ACTIVE 1: Overextension ──
+        # ── ACTIVE 1: LOGIC-C convergent exhaustion (EXEC-5) ──
+        # Block continuation when:
+        #   (a) LOGIC-C signal active (score > 0.4), AND
+        #   (b) entry direction would extend the trend that is exhausting
+        #       (trend_b direction matches entry direction). When trend
+        #       direction is unknown, block conservatively if signal active.
+        if getattr(self, "_logic_c_signal", False):
+            _trend_b_active, _trend_b_dir = self._regime_state.get(
+                "trend_b", (False, ""))
+            _logic_c_score    = getattr(self, "_logic_c_score", 0.0)
+            _logic_c_features = getattr(self, "_logic_c_features", "")
+            if not _trend_b_active or _trend_b_dir == "" or _trend_b_dir == direction:
+                return (
+                    True,
+                    f"LOGIC-C exhaustion {direction}: score={_logic_c_score:.3f} "
+                    f"thr=0.400 active={_logic_c_features or '(none)'}"
+                )
+
+        # ── SHADOW 1: Overextension (DEMOTED EXEC-5 — log only, no block) ──
+        # Computation preserved for diagnostic comparison vs LOGIC-C.
         overext_mult = float(tc.get("overextension_atr_mult", 1.5))
         overext_thr = atr * overext_mult
         if direction == "LONG" and self.liq_top:
             dist = abs(xau_price - self.liq_top)
             if xau_price > self.liq_top and dist > overext_thr:
-                return (True, f"overextended LONG: {dist:.1f}pts > {overext_thr:.1f} ({overext_mult}x ATR)")
+                shadow_signals.append(
+                    f"overextended LONG: {dist:.1f}pts > {overext_thr:.1f} "
+                    f"({overext_mult}x ATR)")
         elif direction == "SHORT" and self.liq_bot:
             dist = abs(self.liq_bot - xau_price)
             if xau_price < self.liq_bot and dist > overext_thr:
-                return (True, f"overextended SHORT: {dist:.1f}pts > {overext_thr:.1f} ({overext_mult}x ATR)")
+                shadow_signals.append(
+                    f"overextended SHORT: {dist:.1f}pts > {overext_thr:.1f} "
+                    f"({overext_mult}x ATR)")
+        if shadow_signals:
+            log.info("EXHAUSTION_SHADOW: %s", " | ".join(shadow_signals))
 
         # ── ACTIVE 2: Impulse 30min (from V3 momentum if available) ──
         if decision is not None:
