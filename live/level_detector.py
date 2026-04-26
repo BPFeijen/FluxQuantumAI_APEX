@@ -176,66 +176,160 @@ def _load_m30_boxes() -> pd.DataFrame | None:
     return _load_parquet_with_retry(M30_BOXES_PATH, "M30")
 
 
+# ----------------------------------------------------------------------------
+# BIAS-DETECTION-COMPLETE-FIX (Asana 1214284676342353, 2026-04-26)
+# ----------------------------------------------------------------------------
+# Rebuilt _get_daily_trend() per literatura ATS+Wyckoff+ICT.
+# Eliminated _get_daily_trend_fallback() — gc_ats_features_v4.parquet was stale
+# 19+ days (last data 2026-04-08) and silently returning "long" when M30
+# derivation hit the Sunday-open partial-bar edge case.
+#
+# Methodology citations (Rule 15 G-METHODOLOGY-FIRST-WORKFLOW):
+#   [Citation 1 — ATS Boxes] "Box estabelecida quando session CLOSES, não
+#       during session." → partial bars excluded from data points.
+#   [Citation 2 — ATS Trend Line] "We start tracking from the very first
+#       instance of the market turning and presenting that inefficiency."
+#       → bias only changes on confirmed inefficiency events (closed bars).
+#   [Citation 3 — Wyckoff Villahermosa] SOS/SOW/JAC events confirmed in
+#       closed bars only; minimum 3-bar sample requirement.
+#   [Citation 4 — ICT Akash Gul / Cascapera] Reference frame = previous
+#       closed structure; never fabricate bias from partial open data.
+#
+# Module-level diagnostic cache populated on each call (read by event_processor
+# heartbeat writer via get_daily_trend_diagnostics()).
+# ----------------------------------------------------------------------------
+
+_LAST_DAILY_TREND_META: dict = {
+    "source": "never_computed",
+    "n_closed_sessions": 0,
+    "freshness_seconds": None,
+    "last_3_fmv": None,
+    "decision_reason": "module_init_default",
+    "computed_at_utc": None,
+}
+
+
+def get_daily_trend_diagnostics() -> dict:
+    """Return shallow copy of last _get_daily_trend() metadata for heartbeat
+    + dashboard. Populated as side effect of _get_daily_trend() calls."""
+    return dict(_LAST_DAILY_TREND_META)
+
+
 def _get_daily_trend() -> str:
     """
-    Derive D1 direction bias from M30 box structure (live, updated every 60s).
-    Falls back to gc_ats_features_v4.parquet if M30 derivation fails.
+    Derive D1 directional bias from M30 box FMV via session-aligned resample.
+    Returns "long" | "short" | "unknown" (preserves existing consumer contract).
 
-    Logic: resample M30 FMV to daily, check last 3 days.
-    If FMVs are monotonically rising -> "long".
-    If FMVs are monotonically falling -> "short".
-    Otherwise -> check last 2 days, then fallback to features_v4.
+    Algorithm (BIAS-DETECTION-COMPLETE-FIX):
+      1. Read M30 FMV from gc_m30_boxes.parquet
+      2. Resample to D1 with offset='22h' (CME Globex session anchor; matches
+         live/d1_h4_updater.py convention SESSION_OFFSET="22h")
+      3. Filter to CLOSED sessions only (drop the current incomplete session
+         whose end-time has not passed) — Citation 1
+      4. Require minimum 3 closed sessions; else return "unknown" — Citation 3
+      5. Strict monotonic on last 3 closed sessions:
+           - all rising  → "long"
+           - all falling → "short"
+           - else        → "unknown"
+      6. NO FALLBACK to stale data (Rule 13 G-CONSERVATIVE-DEFAULT) — formerly
+         the function fell back to gc_ats_features_v4.parquet which was stale
+         19+ days, silently returning incorrect "long" since 2026-04-08.
 
-    ADR-001: D1 provides direction ONLY. Never used for execution levels.
+    Side effect: writes diagnostics to module-level _LAST_DAILY_TREND_META,
+    readable via get_daily_trend_diagnostics() (consumed by heartbeat writer).
     """
+    global _LAST_DAILY_TREND_META
+
+    now_utc = pd.Timestamp.now(tz="UTC")
+    meta = {
+        "source": "unknown_no_data",
+        "n_closed_sessions": 0,
+        "freshness_seconds": None,
+        "last_3_fmv": None,
+        "decision_reason": "default",
+        "computed_at_utc": now_utc.isoformat(),
+    }
+
     try:
+        if not M30_BOXES_PATH.exists():
+            meta["decision_reason"] = "M30_boxes_parquet_missing"
+            _LAST_DAILY_TREND_META = meta
+            log.warning("daily_trend=unknown — %s", meta["decision_reason"])
+            return "unknown"
+
         m30 = pd.read_parquet(M30_BOXES_PATH, columns=["m30_fmv"])
         if m30.index.tz is None:
             m30.index = m30.index.tz_localize("UTC")
         if m30.empty:
-            return _get_daily_trend_fallback()
-
-        # Daily FMV: last M30 FMV per trading day
-        daily_fmv = m30["m30_fmv"].resample("1D").last().dropna()
-        if len(daily_fmv) < 2:
-            return _get_daily_trend_fallback()
-
-        last3 = daily_fmv.tail(3).values
-        if len(last3) >= 3:
-            if all(last3[i] > last3[i-1] for i in range(1, len(last3))):
-                return "long"
-            if all(last3[i] < last3[i-1] for i in range(1, len(last3))):
-                return "short"
-
-        # 2-day fallback
-        last2 = daily_fmv.tail(2).values
-        if last2[-1] > last2[-2]:
-            return "long"
-        elif last2[-1] < last2[-2]:
-            return "short"
-
-        return _get_daily_trend_fallback()
-    except Exception as e:
-        log.warning("daily_trend M30 derivation failed: %s -- falling back to v4", e)
-        return _get_daily_trend_fallback()
-
-
-def _get_daily_trend_fallback() -> str:
-    """Fallback: read from gc_ats_features_v4.parquet (static, may be stale)."""
-    try:
-        df = pd.read_parquet(FEATURES_V4_PATH, columns=["daily_jac_dir"])
-        if df.empty:
+            meta["decision_reason"] = "M30_boxes_empty"
+            _LAST_DAILY_TREND_META = meta
+            log.warning("daily_trend=unknown — %s", meta["decision_reason"])
             return "unknown"
-        val = str(df["daily_jac_dir"].iloc[-1]).lower().strip()
-        if val in ("long", "short"):
-            return val
-        if val == "up":
+
+        # Citation 1: session-aligned anchor. CME Globex daily close = 22:00 UTC
+        # (EST) / 21:00 UTC (EDT). Matches live/d1_h4_updater.py SESSION_OFFSET.
+        # Each label = session start (22:00 UTC of previous day); session ends at
+        # label + 1 day.
+        daily_fmv = m30["m30_fmv"].resample("1D", offset="22h").last().dropna()
+
+        # Citation 1: filter to CLOSED sessions only — drop current in-formation
+        # session. A session labeled `D-1 22:00 UTC` ends at `D 22:00 UTC`.
+        # Closed iff session_end <= now.
+        closed_mask = (daily_fmv.index + pd.Timedelta(days=1)) <= now_utc
+        daily_fmv_closed = daily_fmv[closed_mask]
+
+        meta["n_closed_sessions"] = int(len(daily_fmv_closed))
+
+        if len(daily_fmv_closed) >= 1:
+            last_session_end = daily_fmv_closed.index[-1] + pd.Timedelta(days=1)
+            meta["freshness_seconds"] = round(
+                (now_utc - last_session_end).total_seconds(), 1
+            )
+
+        # Citation 3: minimum 3 closed sessions. NO 2-day fallback (formerly
+        # present, removed for methodological cleanliness).
+        if len(daily_fmv_closed) < 3:
+            meta["source"] = "unknown_insufficient_history"
+            meta["decision_reason"] = (
+                f"insufficient_history (closed_sessions={len(daily_fmv_closed)}, need>=3)"
+            )
+            _LAST_DAILY_TREND_META = meta
+            log.info("daily_trend=unknown — %s", meta["decision_reason"])
+            return "unknown"
+
+        last3 = daily_fmv_closed.tail(3).values
+        meta["last_3_fmv"] = [round(float(v), 3) for v in last3]
+
+        if all(last3[i] > last3[i - 1] for i in range(1, len(last3))):
+            meta["source"] = "m30_resample_closed"
+            meta["decision_reason"] = (
+                f"monotonic_rising_3of3: {meta['last_3_fmv']}"
+            )
+            _LAST_DAILY_TREND_META = meta
+            log.debug("daily_trend=long — %s", meta["decision_reason"])
             return "long"
-        if val == "down":
+        if all(last3[i] < last3[i - 1] for i in range(1, len(last3))):
+            meta["source"] = "m30_resample_closed"
+            meta["decision_reason"] = (
+                f"monotonic_falling_3of3: {meta['last_3_fmv']}"
+            )
+            _LAST_DAILY_TREND_META = meta
+            log.debug("daily_trend=short — %s", meta["decision_reason"])
             return "short"
+
+        meta["source"] = "unknown_no_monotonic"
+        meta["decision_reason"] = (
+            f"no_monotonic_in_last_3_closed: {meta['last_3_fmv']}"
+        )
+        _LAST_DAILY_TREND_META = meta
+        log.info("daily_trend=unknown — %s", meta["decision_reason"])
         return "unknown"
+
     except Exception as e:
-        log.warning("daily_trend fallback read failed: %s", e)
+        meta["source"] = "error"
+        meta["decision_reason"] = f"exception: {type(e).__name__}: {e}"
+        _LAST_DAILY_TREND_META = meta
+        log.warning("_get_daily_trend failed: %s", e)
         return "unknown"
 
 

@@ -1,0 +1,28 @@
+{
+  "task": "BIAS-DETECTION-COMPLETE-FIX Phase B8 backtest comparison",
+  "asana": "1214284676342353",
+  "window": {
+    "start": "2025-07-01 00:00:00+00:00",
+    "end": "2026-04-26 00:00:00+00:00"
+  },
+  "eval_timestamps": 1197,
+  "agreement_rate_pct": 27.9,
+  "old_distribution": {
+    "long": 71.26,
+    "short": 28.74
+  },
+  "new_distribution": {
+    "unknown": 58.56,
+    "long": 27.74,
+    "short": 13.7
+  },
+  "new_source_distribution": {
+    "unknown_no_monotonic": 58.56,
+    "m30_resample_closed": 41.44
+  },
+  "old_definite_new_unknown_count": 701,
+  "old_definite_new_unknown_pct": 58.56,
+  "new_definite_old_unknown_count": 0,
+  "new_definite_old_unknown_pct": 0.0,
+  "elapsed_s": 14.5
+}

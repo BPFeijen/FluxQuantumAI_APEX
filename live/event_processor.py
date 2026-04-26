@@ -67,7 +67,11 @@ from live.operational_rules import OperationalRules
 from live.tick_breakout_monitor import TickBreakoutMonitor
 from live.kill_zones import kill_zone_label
 from live.price_speed import PriceSpeedTracker
-from live.level_detector import derive_m30_bias
+from live.level_detector import (
+    derive_m30_bias,
+    _get_daily_trend,
+    get_daily_trend_diagnostics,
+)
 from live.regime_detectors import detect_trend_a, detect_trend_b
 from live import telegram_notifier as tg
 
@@ -835,6 +839,17 @@ class EventProcessor:
             "m30_bias_confirmed": getattr(self, "m30_bias_confirmed", False),
             "provisional_m30_bias": getattr(self, "provisional_m30_bias", "unknown"),
             "daily_trend": getattr(self, "daily_trend", "unknown"),
+            # BIAS-DETECTION-COMPLETE-FIX: heartbeat honesty per spec Fix 3.
+            # Diagnostics from live/level_detector._LAST_DAILY_TREND_META:
+            #   - source: "m30_resample_closed" | "unknown_insufficient_history"
+            #             | "unknown_no_monotonic" | "unknown_no_data" | "error"
+            #   - n_closed_sessions: count of CLOSED D1 sessions used (must be
+            #     ≥3 for a definite long/short verdict)
+            #   - freshness_seconds: age of last closed session (None if no data;
+            #     dashboard should flag STALE if > 36h * 3600 = 129600s)
+            #   - last_3_fmv: last 3 daily FMV values for forensic visibility
+            #   - decision_reason: human-readable diagnostic
+            "daily_trend_diag": get_daily_trend_diagnostics(),
             "delta_4h": _safe_round(self._metrics.get("delta_4h", 0), 0),
             "atr_m30": _safe_round(self._metrics.get("atr_m30_parquet", self._metrics.get("atr", 0))),
             # Read cached phase from tick loop — do NOT recalculate here (race condition fix)
@@ -1657,10 +1672,24 @@ class EventProcessor:
             provisional_bias, _ = derive_m30_bias(df, confirmed_only=False)
             row = df[df["m30_liq_top"].notna()].iloc[-1] if not df[df["m30_liq_top"].notna()].empty else df.iloc[-1]
 
+            # BIAS-DETECTION-COMPLETE-FIX (Asana 1214284676342353):
+            # daily_trend was previously set ONCE at __init__ and never refreshed,
+            # so a stale boot-time value (e.g. fallback "long" from 19-day-old
+            # gc_ats_features_v4.parquet) persisted until restart. Now refreshed
+            # every refresh_macro_context call (~ per-tick cadence) using the
+            # rebuilt _get_daily_trend() that returns "unknown" instead of
+            # silently falling back to stale data.
+            try:
+                refreshed_daily_trend = _get_daily_trend()
+            except Exception as _dte:
+                log.warning("daily_trend refresh failed: %s", _dte)
+                refreshed_daily_trend = getattr(self, "daily_trend", "unknown")
+
             with self._lock:
                 self.m30_bias = confirmed_bias
                 self.m30_bias_confirmed = is_confirmed
                 self.provisional_m30_bias = provisional_bias
+                self.daily_trend = refreshed_daily_trend
                 if pd.notna(row.get("m30_liq_top")):
                     self.m30_liq_top_gc = float(row.get("m30_liq_top"))
                 if pd.notna(row.get("m30_liq_bot")):
