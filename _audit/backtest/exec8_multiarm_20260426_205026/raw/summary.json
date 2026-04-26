@@ -1,0 +1,122 @@
+{
+  "env": {
+    "python": "3.11.9",
+    "platform": "Windows-10-10.0.17763-SP0",
+    "numpy": "2.3.5",
+    "pandas": "2.3.3",
+    "scipy": "1.17.1",
+    "sklearn": "1.8.0",
+    "seeds": [
+      42,
+      1337,
+      2024,
+      7,
+      1729
+    ]
+  },
+  "feature_meta": {
+    "window_start": "2026-01-25 00:00:00+00:00",
+    "window_end": "2026-04-26 00:00:00+00:00",
+    "rebuilt_sha256": "9871482a7fabeed855009f40b33e99382b2a4af6ce72067522952cf81ddba56b",
+    "boxes_sha256": "50328224b657a0bc11300f359d9b4ae31251014648c0b816b4f7ed4bbd1719de",
+    "calibration_full_sha256": "97dcc627be301ad3673f7841ed0d91b0eef7d6e853af3c17c6062965ae70f659",
+    "m1_rows": 64623,
+    "m30_rows": 2212,
+    "trend_a_n": 1095,
+    "trend_b_n": 288,
+    "feature_n_active": {
+      "F1_B": 64,
+      "F2_B": 58,
+      "F3_B": 102,
+      "F5_A": 52,
+      "F5_B": 35
+    },
+    "label_coverage": {
+      "anti_a_60m_n": 2210,
+      "anti_b_60m_n": 2210
+    }
+  },
+  "arms": {
+    "A_old_040": {
+      "arm": "A_old_040",
+      "n_entries": 136,
+      "n_long": 69,
+      "n_short": 67,
+      "win_rate": 0.4118,
+      "expectancy": -1.4647,
+      "total_pts": -199.2,
+      "max_dd_pts": 350.6,
+      "sharpe_per_trade": -0.0635,
+      "mean_pos_pnl": 17.5696,
+      "mean_neg_pnl": -14.7888
+    },
+    "B_old_025": {
+      "arm": "B_old_025",
+      "n_entries": 205,
+      "n_long": 109,
+      "n_short": 96,
+      "win_rate": 0.4732,
+      "expectancy": -0.6688,
+      "total_pts": -137.1,
+      "max_dd_pts": 338.4,
+      "sharpe_per_trade": -0.0318,
+      "mean_pos_pnl": 14.5722,
+      "mean_neg_pnl": -14.4916
+    },
+    "C_new_040": {
+      "arm": "C_new_040",
+      "n_entries": 55,
+      "n_long": 29,
+      "n_short": 26,
+      "win_rate": 0.5273,
+      "expectancy": 4.6891,
+      "total_pts": 257.9,
+      "max_dd_pts": 120.4,
+      "sharpe_per_trade": 0.1839,
+      "mean_pos_pnl": 20.2034,
+      "mean_neg_pnl": -12.6154
+    },
+    "D_new_025": {
+      "arm": "D_new_025",
+      "n_entries": 90,
+      "n_long": 47,
+      "n_short": 43,
+      "win_rate": 0.5222,
+      "expectancy": 3.2711,
+      "total_pts": 294.4,
+      "max_dd_pts": 136.2,
+      "sharpe_per_trade": 0.1417,
+      "mean_pos_pnl": 17.9745,
+      "mean_neg_pnl": -13.1048
+    },
+    "ablation": {
+      "arm": "ablation",
+      "n_entries": 58,
+      "n_long": 32,
+      "n_short": 26,
+      "win_rate": 0.5862,
+      "expectancy": 3.8776,
+      "total_pts": 224.9,
+      "max_dd_pts": 133.7,
+      "sharpe_per_trade": 0.1425,
+      "mean_pos_pnl": 18.8529,
+      "mean_neg_pnl": -18.0913
+    }
+  },
+  "methodology_compliance": {
+    "n_m30_bars": 2212,
+    "n_m30_box_confirmed": 1350,
+    "n_at_struct_level": 549,
+    "n_trend_b": 288,
+    "n_trend_a": 1095,
+    "label_anti_a_60m_coverage_pct": 99.91,
+    "label_anti_b_60m_coverage_pct": 99.91,
+    "bar_range_zero_count": 1,
+    "body_le_range_count": 2212,
+    "fwd_60m_stats": {
+      "mean_60m": 0.061764705882352944,
+      "std_60m": 22.26068523971406
+    },
+    "notes": "Trend Line dots / Liquidity Lines / Pullback recognition are produced by upstream detection pipelines (e.g. ATS Trend Line Part A, HEAD 8df5db4) and are not exercised by the LOGIC-C entry rule under test. They are CONFIG-AGNOSTIC and identical across all 5 arms. Box/struct counts above provide a sanity check on the regime-gating layer that LOGIC-C consumes."
+  }
+}
