@@ -132,6 +132,19 @@ class HedgeManager:
         self._log_fh = open(HEDGE_LOG_PATH, "a", encoding="utf-8", buffering=1)
         log.info("HedgeManager started (dry_run=%s  lot=%.2f)", dry_run, HEDGE_LOT)
 
+        # P1-POS-LOG (EXEC-3 2026-04-26): startup heartbeat — proves stream
+        # is open & writable at boot. Independent of position state, so the
+        # log mtime updates at every restart even when no hedges have fired.
+        try:
+            import datetime as _dt_hb_hm
+            _hb_ts = _dt_hb_hm.datetime.now(_dt_hb_hm.timezone.utc).isoformat()
+            self._log_fh.write(
+                f"# HEDGE_MANAGER_STARTUP\t{_hb_ts}\tdry_run={dry_run}\tlot={HEDGE_LOT:.2f}\n"
+            )
+            self._log_fh.flush()
+        except Exception as _hb_err:
+            log.warning("hedge-manager startup heartbeat write failed: %s", _hb_err)
+
     def stop(self) -> None:
         try:
             self._log_fh.close()

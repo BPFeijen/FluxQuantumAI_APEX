@@ -426,6 +426,34 @@ class PositionMonitor:
         POSITION_EVENTS_LOG.parent.mkdir(parents=True, exist_ok=True)
         self._canonical_lock = threading.Lock()
 
+        # P1-POS-LOG (EXEC-3 2026-04-26): startup heartbeat — proves both
+        # streams are open & writable at boot, creates POSITION_EVENTS_LOG
+        # (was missing — only created on first _emit_position_event call).
+        # Resolves "logs cold since 4/10" symptom (root cause: 0 positions
+        # tracked since then → no events to emit; heartbeat is independent
+        # of position state).
+        try:
+            import json as _json_hb
+            import datetime as _dt_hb
+            _hb_ts = _dt_hb.datetime.now(_dt_hb.timezone.utc).isoformat()
+            self._dec_log_fh.write(
+                f"# MONITOR_STARTUP\t{_hb_ts}\t"
+                f"dry_run={dry_run}\tlot_size={lot_size}\t"
+                f"executor_live_attached={executor_live is not None}\n"
+            )
+            with open(POSITION_EVENTS_LOG, "a", encoding="utf-8") as _hb_fh:
+                _hb_fh.write(_json_hb.dumps({
+                    "timestamp": _hb_ts,
+                    "event_type": "MONITOR_STARTUP",
+                    "dry_run": dry_run,
+                    "lot_size": lot_size,
+                    "executor_live_attached": executor_live is not None,
+                    "monitor_interval_s": MONITOR_INTERVAL_S,
+                    "t3_mode_planned": str(self._t3_mode) if hasattr(self, "_t3_mode") else "(not_loaded)",
+                }) + "\n")
+        except Exception as _hb_err:
+            log.warning("position-monitor startup heartbeat write failed: %s", _hb_err)
+
         # Hedge manager -- pullback hedge lifecycle (post-SHIELD only)
         self._hedge_mgr = HedgeManager(executor, dry_run=dry_run)
 
