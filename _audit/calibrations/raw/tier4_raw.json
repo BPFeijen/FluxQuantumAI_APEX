@@ -1,0 +1,171 @@
+{
+  "meta": {
+    "calibration_full_sha256": "97dcc627be301ad3673f7841ed0d91b0eef7d6e853af3c17c6062965ae70f659",
+    "calibration_full_path": "C:\\data\\processed\\calibration_dataset_full.parquet",
+    "rows_in_window": 242381,
+    "range_min": "2025-07-01 00:00:00+00:00",
+    "range_max": "2026-04-07 22:01:00+00:00",
+    "delta_caveat": "calibration_dataset_full.parquet is the OLD pipeline source; L2 delta range only Jul 2025 -> 2026-04-07 (NOT to 2026-04-24). Tier 4 calibration uses 9.2 months of L2 (vs 9.7 for Tier 1/3 OHLCV)."
+  },
+  "env": {
+    "python": "3.11.9",
+    "platform": "Windows-10-10.0.17763-SP0",
+    "numpy": "2.3.5",
+    "pandas": "2.3.3",
+    "scipy": "1.17.1",
+    "sklearn": "1.8.0",
+    "seeds": [
+      42,
+      1337,
+      2024,
+      7,
+      1729
+    ]
+  },
+  "t41_vol_climax": {
+    "current_value": 0.68206,
+    "current_activation_rate": 0.09665720462759725,
+    "dist": {
+      "n": 242372,
+      "mean": -0.27158272946232165,
+      "median": -0.5557056872049115,
+      "std": 1.1071399778049893,
+      "iqr": 0.6956144900145478,
+      "p05": -1.0,
+      "p25": -0.7818179331150531,
+      "p75": -0.08620344310050529,
+      "p95": 1.2920502743103641,
+      "min": -1.0,
+      "max": 44.662614063387224,
+      "skewness": 13.439075973624433,
+      "kurtosis": 345.9825230304541
+    },
+    "transform_diag": {
+      "original_skew": 13.439075973624433,
+      "applied": false,
+      "reason": "no valid transform"
+    },
+    "candidates": [
+      {
+        "percentile": 70,
+        "threshold_value": -0.21733263152846935,
+        "n_active": 72712,
+        "activation_rate": 0.30000165035565163,
+        "seed_activation_mean": 0.2995868940726262,
+        "seed_activation_std": 0.0002810888952883341,
+        "fold_activation_mean": 0.2954943723340376,
+        "fold_activation_std": 0.03166929242712522
+      },
+      {
+        "percentile": 75,
+        "threshold_value": -0.08620344310050529,
+        "n_active": 60593,
+        "activation_rate": 0.25,
+        "seed_activation_mean": 0.24959746669623564,
+        "seed_activation_std": 0.00034247859459074796,
+        "fold_activation_mean": 0.24614217482279316,
+        "fold_activation_std": 0.027460644530946193
+      },
+      {
+        "percentile": 80,
+        "threshold_value": 0.08120689420846726,
+        "n_active": 48475,
+        "activation_rate": 0.20000247553347747,
+        "seed_activation_mean": 0.19962351145195648,
+        "seed_activation_std": 0.0004779083121161598,
+        "fold_activation_mean": 0.197171182953119,
+        "fold_activation_std": 0.021161626556126165
+      },
+      {
+        "percentile": 85,
+        "threshold_value": 0.30970072880039895,
+        "n_active": 36356,
+        "activation_rate": 0.15000082517782581,
+        "seed_activation_mean": 0.14977436474004238,
+        "seed_activation_std": 0.00039586692968812627,
+        "fold_activation_mean": 0.1484774685635463,
+        "fold_activation_std": 0.015670690414896025
+      },
+      {
+        "percentile": 90,
+        "threshold_value": 0.6527586718102866,
+        "n_active": 24238,
+        "activation_rate": 0.10000330071130328,
+        "seed_activation_mean": 0.09985920359778645,
+        "seed_activation_std": 0.0003524530715235827,
+        "fold_activation_mean": 0.0992490124694239,
+        "fold_activation_std": 0.009433359932444154
+      }
+    ],
+    "winner_pct": 90,
+    "winner_value": 0.6527586718102866
+  },
+  "t42_delta_weakening": {
+    "current_value": 0.139486,
+    "current_activation_rate": 0.4647422039952819,
+    "dist": {
+      "n": 238231,
+      "mean": -2.1784674313456938,
+      "median": 0.0,
+      "std": 11.753588644451597,
+      "iqr": 2.1111748216106014,
+      "p05": -10.194444444444445,
+      "p25": -1.4861748216106014,
+      "p75": 0.625,
+      "p95": 0.9347826086956522,
+      "min": -1165.0,
+      "max": 1.0,
+      "skewness": -25.26311343405417,
+      "kurtosis": 1309.0116349728391
+    },
+    "transform_diag": {
+      "original_skew": -25.26311343405417,
+      "applied": false,
+      "reason": "no valid transform"
+    },
+    "candidates": [
+      {
+        "percentile": 15,
+        "threshold_value": -3.2199999999999998,
+        "n_active": 202495,
+        "activation_rate": 0.8499943332311916,
+        "seed_activation_mean": 0.8500167904965789,
+        "seed_activation_std": 0.0003033672949001281,
+        "fold_activation_mean": 0.8518077619908164,
+        "fold_activation_std": 0.011529709391615697
+      },
+      {
+        "percentile": 20,
+        "threshold_value": -2.125,
+        "n_active": 190558,
+        "activation_rate": 0.7998875041451364,
+        "seed_activation_mean": 0.7997460437392436,
+        "seed_activation_std": 0.00043181177577757997,
+        "fold_activation_mean": 0.8014919314434966,
+        "fold_activation_std": 0.011444695846954494
+      },
+      {
+        "percentile": 25,
+        "threshold_value": -1.4861748216106014,
+        "n_active": 178673,
+        "activation_rate": 0.7499989505983689,
+        "seed_activation_mean": 0.7498593795911515,
+        "seed_activation_std": 0.0005424195964068541,
+        "fold_activation_mean": 0.7506572978943402,
+        "fold_activation_std": 0.007959488665766895
+      },
+      {
+        "percentile": 30,
+        "threshold_value": -1.0,
+        "n_active": 165412,
+        "activation_rate": 0.694334490473532,
+        "seed_activation_mean": 0.6941338202577342,
+        "seed_activation_std": 0.0006519464032588808,
+        "fold_activation_mean": 0.6939846508025905,
+        "fold_activation_std": 0.0037329833846358345
+      }
+    ],
+    "winner_pct": 30,
+    "winner_value": -1.0
+  }
+}
