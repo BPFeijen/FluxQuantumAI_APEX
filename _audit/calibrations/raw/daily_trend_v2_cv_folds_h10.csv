@@ -1,0 +1,6 @@
+fold,train_n,test_n,best_weights,train_accuracy,test_accuracy,test_n_predictions
+1,33,33,"(np.float64(0.0), np.float64(0.6), np.float64(0.4))",0.7857,1.0,33
+2,66,33,"(np.float64(0.0), np.float64(1.0), np.float64(0.0))",1.0,0.6,25
+3,99,33,"(np.float64(0.0), np.float64(1.0), np.float64(0.0))",0.8182,0.875,32
+4,132,33,"(np.float64(0.0), np.float64(1.0), np.float64(0.0))",0.8391,0.8788,33
+5,165,33,"(np.float64(0.0), np.float64(1.0), np.float64(0.0))",0.85,0.0909,22

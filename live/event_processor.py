@@ -839,16 +839,25 @@ class EventProcessor:
             "m30_bias_confirmed": getattr(self, "m30_bias_confirmed", False),
             "provisional_m30_bias": getattr(self, "provisional_m30_bias", "unknown"),
             "daily_trend": getattr(self, "daily_trend", "unknown"),
-            # BIAS-DETECTION-COMPLETE-FIX: heartbeat honesty per spec Fix 3.
-            # Diagnostics from live/level_detector._LAST_DAILY_TREND_META:
-            #   - source: "m30_resample_closed" | "unknown_insufficient_history"
-            #             | "unknown_no_monotonic" | "unknown_no_data" | "error"
-            #   - n_closed_sessions: count of CLOSED D1 sessions used (must be
-            #     ≥3 for a definite long/short verdict)
+            # BIAS-DETECTION-PURDUE-CALIBRATION (Asana 1214284792412296)
+            # Phase 1 ensemble diagnostics from live/level_detector._LAST_DAILY_TREND_META:
+            #   - source: "ensemble_b_c_agree" | "unknown_b_c_disagree"
+            #             | "unknown_partial_signal" | "unknown_no_signal"
+            #             | "unknown_insufficient_history" | "unknown_no_data"
+            #             | "error"
+            #   - n_closed_sessions: count of CLOSED D1 sessions used (must
+            #     meet _MIN_D1_BARS for any signal to fire)
             #   - freshness_seconds: age of last closed session (None if no data;
             #     dashboard should flag STALE if > 36h * 3600 = 129600s)
-            #   - last_3_fmv: last 3 daily FMV values for forensic visibility
+            #   - signal_a: ATS Trend Line direction at D1 (+1/-1/0). DIAGNOSTIC
+            #     ONLY — empirically refuted on 9.7m window (cal v2 Step 5/9);
+            #     not voting in ensemble. Preserved for Step 8 drift trigger.
+            #   - signal_b: Wyckoff HH/HL @ swing_lookback=3 (+1/-1/0). VOTING.
+            #   - signal_c: ICT BOS/CHoCH @ structure_lookback=5 (+1/-1/0). VOTING.
+            #   - agreement_count: 0 (disagree/insufficient) or 2 (B+C aligned).
             #   - decision_reason: human-readable diagnostic
+            #   - calibration_version: "v2_2026-04-26"
+            #   - computed_at_utc: ISO8601 timestamp of evaluation
             "daily_trend_diag": get_daily_trend_diagnostics(),
             "delta_4h": _safe_round(self._metrics.get("delta_4h", 0), 0),
             "atr_m30": _safe_round(self._metrics.get("atr_m30_parquet", self._metrics.get("atr", 0))),

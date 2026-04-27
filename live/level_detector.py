@@ -60,6 +60,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
+import numpy as np
 import pandas as pd
 
 log = logging.getLogger("apex.level_detector")
@@ -177,34 +178,73 @@ def _load_m30_boxes() -> pd.DataFrame | None:
 
 
 # ----------------------------------------------------------------------------
-# BIAS-DETECTION-COMPLETE-FIX (Asana 1214284676342353, 2026-04-26)
+# BIAS-DETECTION-PURDUE-CALIBRATION (Asana 1214284792412296, 2026-04-27)
 # ----------------------------------------------------------------------------
-# Rebuilt _get_daily_trend() per literatura ATS+Wyckoff+ICT.
-# Eliminated _get_daily_trend_fallback() — gc_ats_features_v4.parquet was stale
-# 19+ days (last data 2026-04-08) and silently returning "long" when M30
-# derivation hit the Sunday-open partial-bar edge case.
+# Phase 1 implementation per Barbara GO 2026-04-27 03:50 UTC. Supersedes
+# BIAS-DETECTION-COMPLETE-FIX (1214284676342353) strict-monotonic heuristic
+# with empirically calibrated tri-methodological ensemble (B+C voting,
+# A diagnostic-only). Calibration artifact:
+#   _audit/calibrations/calibration_daily_trend_v2.md (v2_2026-04-26)
 #
-# Methodology citations (Rule 15 G-METHODOLOGY-FIRST-WORKFLOW):
-#   [Citation 1 — ATS Boxes] "Box estabelecida quando session CLOSES, não
-#       during session." → partial bars excluded from data points.
-#   [Citation 2 — ATS Trend Line] "We start tracking from the very first
-#       instance of the market turning and presenting that inefficiency."
-#       → bias only changes on confirmed inefficiency events (closed bars).
-#   [Citation 3 — Wyckoff Villahermosa] SOS/SOW/JAC events confirmed in
-#       closed bars only; minimum 3-bar sample requirement.
-#   [Citation 4 — ICT Akash Gul / Cascapera] Reference frame = previous
-#       closed structure; never fabricate bias from partial open data.
+# Methodology grounding (Rule 15 G-METHODOLOGY-FIRST-WORKFLOW), citations
+# verbatim from METHODOLOGY_SYNTHESIS_v1.md:
+#
+#   [Citation 1 — ATS Strategic Plan §4 (Forthmann)] "primary tool for
+#       directional bias is the ATS Trend Line. No exceptions."
+#       → Signal A (_compute_signal_a) preserved as DIAGNOSTIC heartbeat
+#       field. Calibration empirically refuted A's discriminative power on
+#       the 9.7m window (Bonferroni p=0.073-0.564, walk-forward weight 0.0).
+#       Per Barbara methodological insight (2026-04-27 03:50 UTC): "ATS é
+#       construída sobre fundações Wyckoff. Quando Signal B (Wyckoff HH/HL)
+#       já captura o sinal estrutural directamente, Signal A torna-se
+#       redundante." A is preserved for forensic visibility + Step 8 drift
+#       trigger (re-evaluate on bear-regime arrival).
+#
+#   [Citation 3 — Wyckoff Method (Villahermosa)] "9 Buying Tests #5+#6:
+#       Higher lows on bar chart, Higher highs on P&F" / "9 Selling Tests
+#       #5+#6: Lower highs, Lower lows"
+#       → Signal B (_compute_signal_b, swing_lookback=3): swing pivot
+#       detection (HH+HL → +1; LH+LL → -1; mixed → 0).
+#       Bonferroni-passing at h=10d (p=0.0008, d=+0.554 — largest effect).
+#
+#   [Citation 4 — ICT/SMC (Akash Gul)] "BOS — Break of Structure: price
+#       breaks a previous swing high/low IN THE DIRECTION of the trend
+#       (continuation). CHoCH — Change of Character: price breaks a swing
+#       AGAINST the trend (reversal warning)."
+#       → Signal C (_compute_signal_c, structure_lookback=5): regime state
+#       machine; flips on swing high/low close-break events.
+#       Bonferroni-passing at h=3d/5d/10d (effect d=+0.221 → +0.459).
+#
+# Ensemble vote (per Barbara GO):
+#   B != 0 AND C != 0 AND B == C → that direction (long/short)
+#   B != C with both != 0       → "unknown" (disagreement)
+#   Either B == 0 or C == 0     → "unknown" (insufficient signal)
+#   Both == 0                   → "unknown" (no signal)
+# Returns "long" | "short" | "unknown" — NEVER "neutral" (consumer contract
+# preservation; spec amendment 1, 2026-04-27 00:15 UTC).
 #
 # Module-level diagnostic cache populated on each call (read by event_processor
 # heartbeat writer via get_daily_trend_diagnostics()).
 # ----------------------------------------------------------------------------
 
+CALIBRATION_VERSION = "v2_2026-04-26"
+SWING_LOOKBACK = 3       # Signal B (Wyckoff HH/HL); best per calibration Step 5
+STRUCTURE_LOOKBACK = 5   # Signal C (ICT BOS/CHoCH); best per calibration Step 5
+# Minimum closed D1 sessions before any signal can fire. Both B and C need
+# 2*lookback + buffer for ≥2 confirmed swings. Use the larger requirement.
+_MIN_D1_BARS = max(2 * SWING_LOOKBACK + 4, 2 * STRUCTURE_LOOKBACK + 2)
+
+
 _LAST_DAILY_TREND_META: dict = {
     "source": "never_computed",
     "n_closed_sessions": 0,
     "freshness_seconds": None,
-    "last_3_fmv": None,
+    "signal_a": 0,                 # diagnostic only — NOT voting per calibration v2
+    "signal_b": 0,                 # Wyckoff HH/HL @ swing_lookback=3
+    "signal_c": 0,                 # ICT BOS/CHoCH @ structure_lookback=5
+    "agreement_count": 0,          # 0 = disagree/insufficient; 2 = B+C aligned
     "decision_reason": "module_init_default",
+    "calibration_version": CALIBRATION_VERSION,
     "computed_at_utc": None,
 }
 
@@ -215,25 +255,146 @@ def get_daily_trend_diagnostics() -> dict:
     return dict(_LAST_DAILY_TREND_META)
 
 
-def _get_daily_trend() -> str:
-    """
-    Derive D1 directional bias from M30 box FMV via session-aligned resample.
-    Returns "long" | "short" | "unknown" (preserves existing consumer contract).
+def _detect_swings(highs: np.ndarray, lows: np.ndarray,
+                   lookback: int) -> tuple[list[int], list[int]]:
+    """N-bar local-extrema swing detection. Returns (sh_indices, sl_indices).
 
-    Algorithm (BIAS-DETECTION-COMPLETE-FIX):
-      1. Read M30 FMV from gc_m30_boxes.parquet
-      2. Resample to D1 with offset='22h' (CME Globex session anchor; matches
-         live/d1_h4_updater.py convention SESSION_OFFSET="22h")
-      3. Filter to CLOSED sessions only (drop the current incomplete session
-         whose end-time has not passed) — Citation 1
-      4. Require minimum 3 closed sessions; else return "unknown" — Citation 3
-      5. Strict monotonic on last 3 closed sessions:
-           - all rising  → "long"
-           - all falling → "short"
-           - else        → "unknown"
-      6. NO FALLBACK to stale data (Rule 13 G-CONSERVATIVE-DEFAULT) — formerly
-         the function fell back to gc_ats_features_v4.parquet which was stale
-         19+ days, silently returning incorrect "long" since 2026-04-08.
+    A swing high at index i requires high[i] = max(high[i-lookback : i+lookback+1])
+    AND high[i] > high[i-1] (tie-break). Symmetric for swing lows. Only indices
+    in [lookback, n-lookback-1] (full lookback windows on both sides) are
+    considered, ensuring non-repainting confirmation.
+
+    Algorithm verbatim from scripts/calibration/calibration_daily_trend_v2.py
+    (Phase 0 calibration); preserves byte-identical signal computation between
+    backtest and live.
+    """
+    n = len(highs)
+    sh: list[int] = []
+    sl: list[int] = []
+    for i in range(lookback, n - lookback):
+        window_high = highs[i - lookback : i + lookback + 1].max()
+        if highs[i] == window_high and (i == 0 or highs[i] > highs[i - 1]):
+            sh.append(i)
+        window_low = lows[i - lookback : i + lookback + 1].min()
+        if lows[i] == window_low and (i == 0 or lows[i] < lows[i - 1]):
+            sl.append(i)
+    return sh, sl
+
+
+def _compute_signal_b(d1_ohlc: pd.DataFrame, lookback: int = SWING_LOOKBACK) -> int:
+    """Signal B — Wyckoff HH/HL on D1, evaluated at the latest closed bar.
+
+    Returns +1 (HH+HL bullish), -1 (LH+LL bearish), 0 (mixed/insufficient).
+    Citation 3 verbatim (see module banner). Non-repainting: only swings with
+    ≥ lookback forward bars eligible.
+    """
+    n = len(d1_ohlc)
+    if n < 2 * lookback + 4:
+        return 0
+    highs = d1_ohlc["high"].values
+    lows = d1_ohlc["low"].values
+    sh_idx, sl_idx = _detect_swings(highs, lows, lookback)
+    t = n - 1  # latest closed bar
+    eligible_sh = [i for i in sh_idx if i <= t - lookback]
+    eligible_sl = [i for i in sl_idx if i <= t - lookback]
+    if len(eligible_sh) < 2 or len(eligible_sl) < 2:
+        return 0
+    sh1_v, sh2_v = highs[eligible_sh[-2]], highs[eligible_sh[-1]]
+    sl1_v, sl2_v = lows[eligible_sl[-2]], lows[eligible_sl[-1]]
+    hh = sh2_v > sh1_v
+    hl = sl2_v > sl1_v
+    lh = sh2_v < sh1_v
+    ll = sl2_v < sl1_v
+    if hh and hl:
+        return +1
+    if lh and ll:
+        return -1
+    return 0
+
+
+def _compute_signal_c(d1_ohlc: pd.DataFrame,
+                      structure_lookback: int = STRUCTURE_LOOKBACK) -> int:
+    """Signal C — ICT BOS/CHoCH regime state machine on D1, evaluated at the
+    latest closed bar.
+
+    Returns +1 (regime up), -1 (regime down), 0 (no event). Citation 4 verbatim
+    (see module banner). Walks chronologically: at each bar, check close vs
+    last confirmed swing high/low; flip regime on break.
+    """
+    n = len(d1_ohlc)
+    if n < 2 * structure_lookback + 2:
+        return 0
+    highs = d1_ohlc["high"].values
+    lows = d1_ohlc["low"].values
+    closes = d1_ohlc["close"].values
+    sh_idx, sl_idx = _detect_swings(highs, lows, structure_lookback)
+    regime = 0
+    for t in range(n):
+        eligible_sh = [i for i in sh_idx if i <= t - structure_lookback]
+        eligible_sl = [i for i in sl_idx if i <= t - structure_lookback]
+        last_sh = highs[eligible_sh[-1]] if eligible_sh else None
+        last_sl = lows[eligible_sl[-1]] if eligible_sl else None
+        c = closes[t]
+        if last_sh is not None and c > last_sh:
+            regime = +1
+        elif last_sl is not None and c < last_sl:
+            regime = -1
+    return regime
+
+
+def _compute_signal_a(d1_ohlc: pd.DataFrame) -> int:
+    """Signal A — ATS Trend Line at D1 (DIAGNOSTIC only, NOT voting).
+
+    Returns +1, -1, or 0. Citation 1: ATS Strategic Plan §4 calls this the
+    "primary tool" for directional bias. Calibration v2 empirically refuted
+    its discriminative power on the 9.7m window (Bonferroni p=0.073-0.564,
+    walk-forward weight 0.0). Preserved here for forensic visibility +
+    bear-regime re-calibration trigger (Step 8 drift policy).
+
+    Lazy import to avoid module load-order coupling.
+    """
+    try:
+        from live.ats_trend_line import (
+            detect_3_candle_fvg, detect_group_inefficiencies,
+        )
+    except Exception as e:
+        log.debug("signal_a unavailable (ats_trend_line import failed): %s", e)
+        return 0
+    if len(d1_ohlc) < 3:
+        return 0
+    try:
+        ineffs = detect_3_candle_fvg(d1_ohlc) + detect_group_inefficiencies(d1_ohlc)
+        ineffs.sort(key=lambda e: (e.ts, e.kind))
+        current_dir = 0
+        for e in ineffs:
+            current_dir = e.direction
+        return int(current_dir)
+    except Exception as e:
+        log.debug("signal_a compute failed: %s", e)
+        return 0
+
+
+def _get_daily_trend() -> str:
+    """Derive D1 directional bias via tri-methodological ensemble (B+C voting,
+    A diagnostic-only). Returns "long" | "short" | "unknown" — NEVER "neutral".
+
+    BIAS-DETECTION-PURDUE-CALIBRATION (Asana 1214284792412296), Phase 1.
+    Calibration: _audit/calibrations/calibration_daily_trend_v2.md.
+
+    Algorithm:
+      1. Read M30 OHLC from gc_m30_boxes.parquet (open/high/low/close cols)
+      2. Resample to D1 with offset='22h' (CME Globex anchor; matches
+         live/d1_h4_updater.py SESSION_OFFSET="22h")
+      3. Filter to CLOSED sessions only (drop in-formation session whose
+         end-time has not passed)
+      4. Require ≥ _MIN_D1_BARS closed sessions; else return "unknown"
+      5. Compute Signal A (diagnostic), Signal B (Wyckoff HH/HL @ lb=3),
+         Signal C (ICT BOS/CHoCH @ lb=5) at the latest closed bar
+      6. Ensemble vote (per Barbara GO 2026-04-27 03:50 UTC):
+           B != 0 AND C != 0 AND B == C → that direction
+           else                          → "unknown"
+      7. NO FALLBACK to gc_ats_features_v4.parquet (eliminated; was source of
+         silent stale "long" bug, see BIAS-DETECTION-COMPLETE-FIX).
 
     Side effect: writes diagnostics to module-level _LAST_DAILY_TREND_META,
     readable via get_daily_trend_diagnostics() (consumed by heartbeat writer).
@@ -241,12 +402,16 @@ def _get_daily_trend() -> str:
     global _LAST_DAILY_TREND_META
 
     now_utc = pd.Timestamp.now(tz="UTC")
-    meta = {
+    meta: dict = {
         "source": "unknown_no_data",
         "n_closed_sessions": 0,
         "freshness_seconds": None,
-        "last_3_fmv": None,
+        "signal_a": 0,
+        "signal_b": 0,
+        "signal_c": 0,
+        "agreement_count": 0,
         "decision_reason": "default",
+        "calibration_version": CALIBRATION_VERSION,
         "computed_at_utc": now_utc.isoformat(),
     }
 
@@ -257,7 +422,10 @@ def _get_daily_trend() -> str:
             log.warning("daily_trend=unknown — %s", meta["decision_reason"])
             return "unknown"
 
-        m30 = pd.read_parquet(M30_BOXES_PATH, columns=["m30_fmv"])
+        # Load M30 OHLC. Volume not needed — agg only requires open/high/low/close.
+        m30 = pd.read_parquet(
+            M30_BOXES_PATH, columns=["open", "high", "low", "close"]
+        )
         if m30.index.tz is None:
             m30.index = m30.index.tz_localize("UTC")
         if m30.empty:
@@ -266,61 +434,67 @@ def _get_daily_trend() -> str:
             log.warning("daily_trend=unknown — %s", meta["decision_reason"])
             return "unknown"
 
-        # Citation 1: session-aligned anchor. CME Globex daily close = 22:00 UTC
-        # (EST) / 21:00 UTC (EDT). Matches live/d1_h4_updater.py SESSION_OFFSET.
-        # Each label = session start (22:00 UTC of previous day); session ends at
-        # label + 1 day.
-        daily_fmv = m30["m30_fmv"].resample("1D", offset="22h").last().dropna()
+        # Resample to D1 with CME Globex anchor (offset='22h'). Matches the
+        # convention used by live/d1_h4_updater.py SESSION_OFFSET and by the
+        # Phase 0 calibration (scripts/calibration/calibration_daily_trend_v2.py).
+        d1_ohlc = m30.resample("1D", offset="22h").agg({
+            "open": "first", "high": "max", "low": "min", "close": "last",
+        }).dropna()
 
-        # Citation 1: filter to CLOSED sessions only — drop current in-formation
-        # session. A session labeled `D-1 22:00 UTC` ends at `D 22:00 UTC`.
-        # Closed iff session_end <= now.
-        closed_mask = (daily_fmv.index + pd.Timedelta(days=1)) <= now_utc
-        daily_fmv_closed = daily_fmv[closed_mask]
+        # Filter to CLOSED sessions only — a session labeled `D-1 22:00 UTC`
+        # ends at `D 22:00 UTC`; keep iff session_end <= now_utc.
+        closed_mask = (d1_ohlc.index + pd.Timedelta(days=1)) <= now_utc
+        d1_closed = d1_ohlc[closed_mask]
 
-        meta["n_closed_sessions"] = int(len(daily_fmv_closed))
+        meta["n_closed_sessions"] = int(len(d1_closed))
 
-        if len(daily_fmv_closed) >= 1:
-            last_session_end = daily_fmv_closed.index[-1] + pd.Timedelta(days=1)
+        if len(d1_closed) >= 1:
+            last_session_end = d1_closed.index[-1] + pd.Timedelta(days=1)
             meta["freshness_seconds"] = round(
                 (now_utc - last_session_end).total_seconds(), 1
             )
 
-        # Citation 3: minimum 3 closed sessions. NO 2-day fallback (formerly
-        # present, removed for methodological cleanliness).
-        if len(daily_fmv_closed) < 3:
+        if len(d1_closed) < _MIN_D1_BARS:
             meta["source"] = "unknown_insufficient_history"
             meta["decision_reason"] = (
-                f"insufficient_history (closed_sessions={len(daily_fmv_closed)}, need>=3)"
+                f"insufficient_history (closed_sessions={len(d1_closed)}, "
+                f"need>={_MIN_D1_BARS})"
             )
             _LAST_DAILY_TREND_META = meta
             log.info("daily_trend=unknown — %s", meta["decision_reason"])
             return "unknown"
 
-        last3 = daily_fmv_closed.tail(3).values
-        meta["last_3_fmv"] = [round(float(v), 3) for v in last3]
+        # Compute the three signals (A diagnostic, B+C voting).
+        sig_a = _compute_signal_a(d1_closed)
+        sig_b = _compute_signal_b(d1_closed, lookback=SWING_LOOKBACK)
+        sig_c = _compute_signal_c(d1_closed, structure_lookback=STRUCTURE_LOOKBACK)
+        meta["signal_a"] = int(sig_a)
+        meta["signal_b"] = int(sig_b)
+        meta["signal_c"] = int(sig_c)
 
-        if all(last3[i] > last3[i - 1] for i in range(1, len(last3))):
-            meta["source"] = "m30_resample_closed"
-            meta["decision_reason"] = (
-                f"monotonic_rising_3of3: {meta['last_3_fmv']}"
-            )
+        # Ensemble vote: B+C agreement (Barbara GO 2026-04-27 03:50 UTC).
+        if sig_b != 0 and sig_c != 0 and sig_b == sig_c:
+            meta["agreement_count"] = 2
+            decision = "long" if sig_b == +1 else "short"
+            meta["source"] = "ensemble_b_c_agree"
+            meta["decision_reason"] = f"b={sig_b},c={sig_c} (agree → {decision})"
             _LAST_DAILY_TREND_META = meta
-            log.debug("daily_trend=long — %s", meta["decision_reason"])
-            return "long"
-        if all(last3[i] < last3[i - 1] for i in range(1, len(last3))):
-            meta["source"] = "m30_resample_closed"
-            meta["decision_reason"] = (
-                f"monotonic_falling_3of3: {meta['last_3_fmv']}"
-            )
-            _LAST_DAILY_TREND_META = meta
-            log.debug("daily_trend=short — %s", meta["decision_reason"])
-            return "short"
+            log.debug("daily_trend=%s — %s", decision, meta["decision_reason"])
+            return decision
 
-        meta["source"] = "unknown_no_monotonic"
-        meta["decision_reason"] = (
-            f"no_monotonic_in_last_3_closed: {meta['last_3_fmv']}"
-        )
+        meta["agreement_count"] = 0
+        if sig_b != 0 and sig_c != 0 and sig_b != sig_c:
+            meta["source"] = "unknown_b_c_disagree"
+            meta["decision_reason"] = f"b={sig_b},c={sig_c} (disagree)"
+        elif sig_b == 0 and sig_c == 0:
+            meta["source"] = "unknown_no_signal"
+            meta["decision_reason"] = "b=0,c=0 (both neutral)"
+        else:
+            which = "b" if sig_b == 0 else "c"
+            meta["source"] = "unknown_partial_signal"
+            meta["decision_reason"] = (
+                f"b={sig_b},c={sig_c} ({which}=0, partial signal)"
+            )
         _LAST_DAILY_TREND_META = meta
         log.info("daily_trend=unknown — %s", meta["decision_reason"])
         return "unknown"
