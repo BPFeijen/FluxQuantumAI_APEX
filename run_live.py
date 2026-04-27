@@ -69,6 +69,20 @@ from typing import Optional
 
 import pandas as pd
 
+# Force UTF-8 on stdout/stderr so banner / status prints with non-ASCII
+# characters (— → ━ etc., introduced during SISTEMA-SIGNAL-ONLY-INTERIM
+# Bloco C wiring) don't crash under the Windows cp1252 default codec when
+# the process is launched via cmd.exe redirect. The crash previously
+# manifested as SignalEmitter "ERROR loading" because the celebration
+# print inside the try-block raised UnicodeEncodeError, falling through
+# to the except clause that null'd `_executor`.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, ValueError):
+    # AttributeError on legacy stdio shims; ValueError if already wrapped.
+    pass
+
 sys.path.insert(0, str(Path(__file__).parent))
 
 from ats_live_gate import ATSLiveGate
