@@ -284,7 +284,7 @@ def notify_execution() -> bool:
         )
 
     else:
-        log.warning("notify_execution: unexpected action=%s", action)
+        _log.warning("notify_execution: unexpected action=%s", action)
         return False
 
     _send_async(text)
@@ -894,3 +894,98 @@ def notify_feat4_veto(
         f"Time: {datetime.now(timezone.utc).strftime('%H:%M:%S')} UTC"
     )
     _send_async(text)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# MACRO MONITOR — Virtual Active Position alerts (MACRO-MONITOR-VAP)
+# Asana 1214290409737742. Alerts triggered by live/macro_monitor.py when
+# conditions reverse against a Virtual Active Position. Independent of
+# broker connection; operator manually closes any real positions held.
+# ═══════════════════════════════════════════════════════════════════════
+
+_MACRO_TRIGGER_ICON = {
+    "ICEBERG_AGAINST":  "\U0001F6A8",   # 🚨
+    "ANOMALY_AGAINST":  "⚠️",
+    "REGIME_FLIP_M30":  "\U0001F504",   # 🔄
+    "VIRTUAL_TP1":      "✅",
+    "VIRTUAL_SL":       "\U0001F6D1",   # 🛑
+}
+
+
+def _vap_age_min_str(entry_ts: str) -> str:
+    try:
+        entry = datetime.fromisoformat(entry_ts)
+        if entry.tzinfo is None:
+            entry = entry.replace(tzinfo=timezone.utc)
+        delta = datetime.now(timezone.utc) - entry
+        mins = int(delta.total_seconds() / 60)
+        if mins < 60:
+            return f"{mins}min"
+        h, m = divmod(mins, 60)
+        return f"{h}h{m:02d}min"
+    except Exception:
+        return "n/a"
+
+
+def notify_macro_exit(
+    vap_id: str,
+    direction: str,
+    entry_price: float,
+    entry_ts: str,
+    current_price: float,
+    trigger: str,
+    severity: str,
+    reason: str,
+    sl: float = 0.0,
+    tp1: float = 0.0,
+) -> bool:
+    """First MACRO-EXIT alert for a Virtual Active Position.
+
+    Different visual prefix from PM_EVENT alerts so operator can distinguish
+    decision-driven (MM, no MT5) from broker-driven (PM, real position) alerts.
+    """
+    icon = _MACRO_TRIGGER_ICON.get(trigger, "\U0001F6A8")
+    unrealized = (entry_price - current_price) if direction == "SHORT" else (current_price - entry_price)
+    age_str = _vap_age_min_str(entry_ts)
+
+    text = (
+        f"{icon} <b>MACRO ALERT — {direction}</b>\n"
+        f"Trigger: {trigger} ({severity})\n"
+        f"Reason:  {reason}\n"
+        f"\n"
+        f"Virtual entry: {entry_price:.2f}  (id: {vap_id[:8]})\n"
+        f"Current:       {current_price:.2f}  ({unrealized:+.1f} pts unrealized)\n"
+        f"Age:           {age_str}\n"
+        f"SL: {sl:.2f} | TP1: {tp1:.2f}\n"
+        f"\n"
+        f"⚡ Action: review your {direction} position(s) — broker side"
+    )
+    _send_async(text)
+    return True
+
+
+def notify_macro_additional(
+    vap_id: str,
+    direction: str,
+    trigger: str,
+    severity: str,
+    reason: str,
+    prior_triggers: list,
+) -> bool:
+    """ADDITIONAL trigger fired on a VAP that's already in EXIT_SUGGESTED state.
+
+    Framed differently to indicate the operator should already be aware of the
+    VAP exit suggestion; this is supporting evidence.
+    """
+    prior_str = ", ".join(prior_triggers) if prior_triggers else "(none)"
+    text = (
+        f"⚠️ <b>ADDITIONAL EXIT TRIGGER — {direction}</b>\n"
+        f"New trigger: {trigger} ({severity})\n"
+        f"Reason:      {reason}\n"
+        f"\n"
+        f"VAP id:         {vap_id[:8]}\n"
+        f"Active total:   {len(prior_triggers) + 1} triggers\n"
+        f"Prior triggers: {prior_str}"
+    )
+    _send_async(text)
+    return True

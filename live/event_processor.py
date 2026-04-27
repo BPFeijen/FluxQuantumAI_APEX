@@ -72,6 +72,7 @@ from live.level_detector import (
     _get_daily_trend,
     get_daily_trend_diagnostics,
 )
+from live.macro_monitor import get_active_virtual_position
 from live.regime_detectors import detect_trend_a, detect_trend_b
 from live import telegram_notifier as tg
 
@@ -859,6 +860,11 @@ class EventProcessor:
             #   - calibration_version: "v2_2026-04-26"
             #   - computed_at_utc: ISO8601 timestamp of evaluation
             "daily_trend_diag": get_daily_trend_diagnostics(),
+            # MACRO-MONITOR-VAP (Asana 1214290409737742):
+            # active_virtual_position is the current VAP tracked by MacroMonitor
+            # (live/macro_monitor.py). null if no GO has been emitted recently
+            # or VAP expired. See _audit/calibrations/calibration_macro_monitor_v1.md.
+            "active_virtual_position": get_active_virtual_position(),
             "delta_4h": _safe_round(self._metrics.get("delta_4h", 0), 0),
             "atr_m30": _safe_round(self._metrics.get("atr_m30_parquet", self._metrics.get("atr", 0))),
             # Read cached phase from tick loop — do NOT recalculate here (race condition fix)

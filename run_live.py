@@ -801,6 +801,18 @@ def _run_event_driven(args) -> None:
     else:
         print(_color("WARNING: MT5Executor not available -- PositionMonitor disabled", _YELLOW))
 
+    # --- Layer 4.5: MacroMonitor (broker-independent VAP tracker) ---
+    # MACRO-MONITOR-VAP (Asana 1214290409737742). Tracks last GO decision as a
+    # Virtual Active Position and alerts via Telegram + heartbeat when conditions
+    # reverse. Independent of MT5 / broker connection.
+    try:
+        from live.macro_monitor import MacroMonitor as _MacroMonitor
+        macro_monitor = _MacroMonitor()
+        macro_monitor.start()
+    except Exception as _mm_err:
+        print(_color(f"WARNING: MacroMonitor failed to start: {_mm_err}", _YELLOW))
+        macro_monitor = None
+
     # --- Layer 2: EventProcessor (blocks main thread) ---
     processor = _EventProcessor(
         liq_top      = levels["liq_top"],

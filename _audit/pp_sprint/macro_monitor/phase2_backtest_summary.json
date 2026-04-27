@@ -1,0 +1,291 @@
+{
+  "task": "MACRO-MONITOR-VAP Phase 2 backtest",
+  "asana": "1214290409737742",
+  "decision_log": "C:\\FluxQuantumAI\\logs\\decision_log.jsonl",
+  "n_decisions_total": 21946,
+  "n_go_decisions": 5234,
+  "n_go_long": 1631,
+  "n_go_short": 3603,
+  "n_vaps_processed": 5234,
+  "n_vaps_no_outcome": 5,
+  "vap_max_lifetime_min": 240,
+  "horizons_min": [
+    30,
+    60,
+    120
+  ],
+  "primary_horizon_min": 60,
+  "false_alarm_rate_gate": 0.3,
+  "elapsed_s": 761.0,
+  "per_trigger": {
+    "ICEBERG_AGAINST": {
+      "fired_count": 0,
+      "fire_rate_per_vap_pct": 0.0,
+      "first_fire_age_min": {
+        "mean": null,
+        "median": null,
+        "n": 0
+      },
+      "per_horizon": {
+        "h30min": {
+          "true_positive": 0,
+          "false_positive": 0,
+          "evaluations_with_outcome": 0,
+          "precision": null,
+          "false_alarm_rate": null
+        },
+        "h60min": {
+          "true_positive": 0,
+          "false_positive": 0,
+          "evaluations_with_outcome": 0,
+          "precision": null,
+          "false_alarm_rate": null
+        },
+        "h120min": {
+          "true_positive": 0,
+          "false_positive": 0,
+          "evaluations_with_outcome": 0,
+          "precision": null,
+          "false_alarm_rate": null
+        }
+      },
+      "examples": []
+    },
+    "ANOMALY_AGAINST": {
+      "fired_count": 0,
+      "fire_rate_per_vap_pct": 0.0,
+      "first_fire_age_min": {
+        "mean": null,
+        "median": null,
+        "n": 0
+      },
+      "per_horizon": {
+        "h30min": {
+          "true_positive": 0,
+          "false_positive": 0,
+          "evaluations_with_outcome": 0,
+          "precision": null,
+          "false_alarm_rate": null
+        },
+        "h60min": {
+          "true_positive": 0,
+          "false_positive": 0,
+          "evaluations_with_outcome": 0,
+          "precision": null,
+          "false_alarm_rate": null
+        },
+        "h120min": {
+          "true_positive": 0,
+          "false_positive": 0,
+          "evaluations_with_outcome": 0,
+          "precision": null,
+          "false_alarm_rate": null
+        }
+      },
+      "examples": []
+    },
+    "REGIME_FLIP_M30": {
+      "fired_count": 1085,
+      "fire_rate_per_vap_pct": 20.73,
+      "first_fire_age_min": {
+        "mean": 155.0,
+        "median": 166.6,
+        "n": 1085
+      },
+      "per_horizon": {
+        "h30min": {
+          "true_positive": 672,
+          "false_positive": 413,
+          "evaluations_with_outcome": 1085,
+          "precision": 0.6194,
+          "false_alarm_rate": 0.3806
+        },
+        "h60min": {
+          "true_positive": 183,
+          "false_positive": 902,
+          "evaluations_with_outcome": 1085,
+          "precision": 0.1687,
+          "false_alarm_rate": 0.8313
+        },
+        "h120min": {
+          "true_positive": 148,
+          "false_positive": 937,
+          "evaluations_with_outcome": 1085,
+          "precision": 0.1364,
+          "false_alarm_rate": 0.8636
+        }
+      },
+      "examples": [
+        {
+          "vap_id": "fc5c68d3",
+          "vap_dir": "SHORT",
+          "vap_entry": 4794.29,
+          "fired_at_age_min": 197.1,
+          "snap_price": 4800.82
+        },
+        {
+          "vap_id": "f83964ed",
+          "vap_dir": "SHORT",
+          "vap_entry": 4794.29,
+          "fired_at_age_min": 197.1,
+          "snap_price": 4800.82
+        },
+        {
+          "vap_id": "e2be3391",
+          "vap_dir": "SHORT",
+          "vap_entry": 4795.74,
+          "fired_at_age_min": 195.7,
+          "snap_price": 4800.82
+        }
+      ]
+    },
+    "VIRTUAL_TP1": {
+      "fired_count": 827,
+      "fire_rate_per_vap_pct": 15.8,
+      "first_fire_age_min": {
+        "mean": 115.9,
+        "median": 111.6,
+        "n": 827
+      },
+      "per_horizon": {
+        "h30min": {
+          "true_positive": 577,
+          "false_positive": 250,
+          "evaluations_with_outcome": 827,
+          "precision": 0.6977,
+          "false_alarm_rate": 0.3023
+        },
+        "h60min": {
+          "true_positive": 283,
+          "false_positive": 255,
+          "evaluations_with_outcome": 538,
+          "precision": 0.526,
+          "false_alarm_rate": 0.474
+        },
+        "h120min": {
+          "true_positive": 77,
+          "false_positive": 461,
+          "evaluations_with_outcome": 538,
+          "precision": 0.1431,
+          "false_alarm_rate": 0.8569
+        }
+      },
+      "examples": [
+        {
+          "vap_id": "aea2c9c4",
+          "vap_dir": "SHORT",
+          "vap_entry": 4769.34,
+          "fired_at_age_min": 9.3,
+          "snap_price": 4748.23
+        },
+        {
+          "vap_id": "b943be0a",
+          "vap_dir": "SHORT",
+          "vap_entry": 4768.99,
+          "fired_at_age_min": 9.2,
+          "snap_price": 4748.23
+        },
+        {
+          "vap_id": "e20d4e65",
+          "vap_dir": "SHORT",
+          "vap_entry": 4766.44,
+          "fired_at_age_min": 9.4,
+          "snap_price": 4741.33
+        }
+      ]
+    },
+    "VIRTUAL_SL": {
+      "fired_count": 1206,
+      "fire_rate_per_vap_pct": 23.04,
+      "first_fire_age_min": {
+        "mean": 111.9,
+        "median": 119.1,
+        "n": 1206
+      },
+      "per_horizon": {
+        "h30min": {
+          "true_positive": 779,
+          "false_positive": 427,
+          "evaluations_with_outcome": 1206,
+          "precision": 0.6459,
+          "false_alarm_rate": 0.3541
+        },
+        "h60min": {
+          "true_positive": 458,
+          "false_positive": 748,
+          "evaluations_with_outcome": 1206,
+          "precision": 0.3798,
+          "false_alarm_rate": 0.6202
+        },
+        "h120min": {
+          "true_positive": 382,
+          "false_positive": 824,
+          "evaluations_with_outcome": 1206,
+          "precision": 0.3167,
+          "false_alarm_rate": 0.6833
+        }
+      },
+      "examples": [
+        {
+          "vap_id": "aea2c9c4",
+          "vap_dir": "SHORT",
+          "vap_entry": 4769.34,
+          "fired_at_age_min": 94.7,
+          "snap_price": 4789.38
+        },
+        {
+          "vap_id": "b943be0a",
+          "vap_dir": "SHORT",
+          "vap_entry": 4768.99,
+          "fired_at_age_min": 94.7,
+          "snap_price": 4789.38
+        },
+        {
+          "vap_id": "e20d4e65",
+          "vap_dir": "SHORT",
+          "vap_entry": 4766.44,
+          "fired_at_age_min": 87.7,
+          "snap_price": 4787.18
+        }
+      ]
+    }
+  },
+  "gate_results": {
+    "ICEBERG_AGAINST": {
+      "fired_count": 0,
+      "fire_rate_per_vap": 0.0,
+      "primary_h_false_alarm_rate": null,
+      "primary_h_precision": null,
+      "GATE_PASS_at_30pct_false_alarm": false
+    },
+    "ANOMALY_AGAINST": {
+      "fired_count": 0,
+      "fire_rate_per_vap": 0.0,
+      "primary_h_false_alarm_rate": null,
+      "primary_h_precision": null,
+      "GATE_PASS_at_30pct_false_alarm": false
+    },
+    "REGIME_FLIP_M30": {
+      "fired_count": 1085,
+      "fire_rate_per_vap": 0.2073,
+      "primary_h_false_alarm_rate": 0.8313,
+      "primary_h_precision": 0.1687,
+      "GATE_PASS_at_30pct_false_alarm": false
+    },
+    "VIRTUAL_TP1": {
+      "fired_count": 827,
+      "fire_rate_per_vap": 0.158,
+      "primary_h_false_alarm_rate": 0.474,
+      "primary_h_precision": 0.526,
+      "GATE_PASS_at_30pct_false_alarm": false
+    },
+    "VIRTUAL_SL": {
+      "fired_count": 1206,
+      "fire_rate_per_vap": 0.2304,
+      "primary_h_false_alarm_rate": 0.6202,
+      "primary_h_precision": 0.3798,
+      "GATE_PASS_at_30pct_false_alarm": false
+    }
+  },
+  "all_triggers_gate_pass": false
+}
