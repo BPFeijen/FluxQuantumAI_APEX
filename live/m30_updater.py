@@ -208,6 +208,20 @@ def _detect_boxes(m30: pd.DataFrame) -> pd.DataFrame:
 
     Parameters: CONTRACTION_THR=1.2, MIN_BARS=3,
                 MAX_BREAKOUT_WAIT=20, MAX_JAC_WAIT=40
+
+    Liq semantics — UPDATED 2026-04-28 (M30-BIAS-DERIVATION-AUDIT
+    Asana 1214320481337073, Opção 2):
+        Pre-fix: m30_liq_top / m30_liq_bot were FROZEN at the moment of
+        breakout (fakeout_ext for breakout direction; box_low/box_high
+        for the opposite side ⇒ no extension recorded for the
+        non-breakout direction even when price made deep excursions
+        afterwards). This produced direction-asymmetric data that
+        Wyckoff/ATS classifiers consumed as "no bear ext" while price
+        had moved -33pts below the box (Box 5259 forensic example).
+        Post-fix: m30_liq_top / m30_liq_bot track the TRUE max(high) /
+        min(low) DURING THE BOX'S ENTIRE LIFESPAN (from breakout_idx
+        through subsequent bars while the box_id remains active).
+        Aligns with classical Wyckoff "liquidity grab" semantics.
     """
     n        = len(m30)
     high_a   = m30["high"].values.copy()
@@ -236,8 +250,17 @@ def _detect_boxes(m30: pd.DataFrame) -> pd.DataFrame:
     while i < n:
         atr = atr_a[i]
 
-        # Forward-fill current levels
+        # Forward-fill current levels (and update liq excursion if box still alive)
         if not np.isnan(cur_liq_top):
+            # Per "true excursion during box life" semantics (2026-04-28 fix):
+            # extend cur_liq_top / cur_liq_bot to include this bar's high/low.
+            if cur_box_id > 0:
+                bar_hi = high_a[i]
+                bar_lo = low_a[i]
+                if not np.isnan(bar_hi) and bar_hi > cur_liq_top:
+                    cur_liq_top = float(bar_hi)
+                if not np.isnan(bar_lo) and bar_lo < cur_liq_bot:
+                    cur_liq_bot = float(bar_lo)
             out_liq_top[i]   = cur_liq_top
             out_liq_bot[i]   = cur_liq_bot
             out_fmv[i]       = cur_fmv
@@ -287,10 +310,17 @@ def _detect_boxes(m30: pd.DataFrame) -> pd.DataFrame:
         # Register one-pass box
         box_counter += 1
         fmv = (b_hi + b_lo) / 2.0
+        # Initial liq excursion = max/min of (box edges, breakout bar wick).
+        # Subsequent bars during box life extend these via the forward-fill
+        # and JAC-scan blocks below (2026-04-28 fix).
+        bar_hi_b = float(high_a[breakout_idx])
+        bar_lo_b = float(low_a[breakout_idx])
         if breakout_dir == "UP":
-            new_liq_top, new_liq_bot = fakeout_ext, float(b_lo)
+            new_liq_top = max(fakeout_ext, bar_hi_b, float(b_hi))
+            new_liq_bot = min(float(b_lo), bar_lo_b)
         else:
-            new_liq_top, new_liq_bot = float(b_hi), fakeout_ext
+            new_liq_top = max(float(b_hi), bar_hi_b)
+            new_liq_bot = min(fakeout_ext, bar_lo_b, float(b_lo))
 
         cur_liq_top, cur_liq_bot  = new_liq_top, new_liq_bot
         cur_fmv      = fmv
@@ -310,6 +340,13 @@ def _detect_boxes(m30: pd.DataFrame) -> pd.DataFrame:
         # Scan forward for JAC confirmation
         jac_found = False
         for k in range(breakout_idx + 1, min(breakout_idx + MAX_JAC_WAIT + 1, n)):
+            # Update liq excursion during JAC scan (2026-04-28 fix)
+            bar_hi_k = high_a[k]
+            bar_lo_k = low_a[k]
+            if not np.isnan(bar_hi_k) and bar_hi_k > cur_liq_top:
+                cur_liq_top = float(bar_hi_k)
+            if not np.isnan(bar_lo_k) and bar_lo_k < cur_liq_bot:
+                cur_liq_bot = float(bar_lo_k)
             out_liq_top[k]   = cur_liq_top
             out_liq_bot[k]   = cur_liq_bot
             out_fmv[k]       = cur_fmv
