@@ -791,19 +791,10 @@ def _run_event_driven(args) -> None:
     elif not args.no_updaters:
         print(_color("WARNING: M30 Updater not available -- m30_bias will be unknown", _YELLOW))
 
-    # --- D1/H4 Bias Engine (FASE 4a shadow -- RE-ENABLED) ---
-    # Re-enabled 2026-04-29 per STALE-D1H4-001 (Asana 1214284204948063).
-    # The 1 GB RAM / 90 % CPU regression that caused the 2026-04-21 disable
-    # (commit 3e80ed6) has been addressed via windowed rebuild: 60-day
-    # pyarrow predicate pushdown + DATA-002 trades.price source. Per-cycle
-    # CPU < 5 s, memory < 50 MB. Cadence 300 s (unchanged).
-    # See `_audit/design/D1H4_UPDATER_INCREMENTAL.md` for full design.
-    if not args.no_updaters and _start_d1h4_updater is not None:
-        _get_dt = lambda: getattr(processor, "daily_trend", "unknown")
-        _start_d1h4_updater(get_daily_trend_fn=_get_dt)
-        print(_color("D1H4 Updater started (300s cadence, SHADOW MODE)", _CYAN))
-    elif not args.no_updaters:
-        print(_color("WARNING: D1H4 Updater not available -- d1h4_bias will be stale", _YELLOW))
+    # D1H4 updater is started LATER, after `processor` is instantiated
+    # (line ~800). The `_get_dt` lambda needs `processor` in scope or the
+    # daemon thread's first run_update cycle will fail with
+    # "cannot access free variable 'processor'". See line ~826 below.
 
     # --- Layer 4: PositionMonitor (background thread) ---
     if _executor is not None:
@@ -856,6 +847,24 @@ def _run_event_driven(args) -> None:
             monitor.set_market_state(processor)
         except Exception as _ipc_err:
             print(_color(f"WARNING: monitor.set_market_state failed: {_ipc_err}", _YELLOW))
+
+    # --- D1/H4 Bias Engine (FASE 4a shadow -- RE-ENABLED) ---
+    # Re-enabled 2026-04-29 per STALE-D1H4-001 (Asana 1214284204948063).
+    # MUST be after `processor` is instantiated (line 800) — the `_get_dt`
+    # lambda captures `processor` by name and the daemon thread's first
+    # run_update cycle calls it inside `shadow_compare`. If started before
+    # processor exists, the daemon raises "cannot access free variable".
+    # The 1 GB RAM / 90 % CPU regression that caused the 2026-04-21 disable
+    # (commit 3e80ed6) has been addressed via windowed rebuild: 60-day
+    # pyarrow predicate pushdown + DATA-002 trades.price source. Per-cycle
+    # CPU < 5 s, memory < 50 MB. Cadence 300 s.
+    # See `_audit/design/D1H4_UPDATER_INCREMENTAL.md` for full design.
+    if not args.no_updaters and _start_d1h4_updater is not None:
+        _get_dt = lambda: getattr(processor, "daily_trend", "unknown")
+        _start_d1h4_updater(get_daily_trend_fn=_get_dt)
+        print(_color("D1H4 Updater started (300s cadence, SHADOW MODE)", _CYAN))
+    elif not args.no_updaters:
+        print(_color("WARNING: D1H4 Updater not available -- d1h4_bias will be stale", _YELLOW))
 
     # --- Initialize M30 bias immediately (don't wait for first refresh cycle) ---
     # Without this, gates have no data for the first ~15-75s after startup.
