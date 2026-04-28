@@ -29,10 +29,12 @@ Standalone: python live/m30_updater.py [--once]
 
 from __future__ import annotations
 
+import json
 import logging
 import sys
 import threading
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -48,6 +50,7 @@ DATA_DIR       = Path("C:/data")
 M1_PATH        = DATA_DIR / "processed/gc_ohlcv_l2_joined.parquet"
 OUTPUT_M30     = DATA_DIR / "processed/gc_m30_boxes.parquet"
 MICRO_DIR      = Path("C:/data/level2/_gc_xcec")
+DECISION_LOG_PATH = Path("C:/FluxQuantumAI/logs/decision_log.jsonl")  # P1.3 telemetry
 
 # Box detection parameters -- must match m30_box_detection.py (calibrated 2026-04-07)
 CONTRACTION_THR   = 1.2
@@ -57,11 +60,19 @@ MAX_JAC_WAIT      = 40
 AT_STRUCT_TOL     = 0.2
 WIN               = 5       # rolling window for range_ratio
 
+# P1.3 M30-BOX-STAGNATION-RULE (Asana 1214327736913830)
+# Phase 2 backtest winner: A K=2.0 GLOBAL — expire active box when close
+# excursion beyond box edges exceeds 2.0 × ATR-at-creation. Family-of-4
+# Bonferroni p=0.012, +247 pts/month hypothetical recovery (5:1 R:R).
+# See _audit/M30_BOX_STAGNATION_BACKTEST.md.
+BOX_EXPIRY_K_ATR  = 2.0
+
 OUTPUT_COLS = [
     'open', 'high', 'low', 'close', 'volume', 'atr14',
     'm30_liq_top', 'm30_liq_bot', 'm30_fmv',
     'm30_box_high', 'm30_box_low', 'm30_box_confirmed',
     'm30_box_id', 'at_struct_level',
+    'm30_box_atr_at_creation',
 ]
 
 
@@ -200,7 +211,7 @@ def _m1_to_m30_base(m1: pd.DataFrame) -> pd.DataFrame:
 # Step 3 -- box detection state machine (mirrors m30_box_detection.py)
 # ---------------------------------------------------------------------------
 
-def _detect_boxes(m30: pd.DataFrame) -> pd.DataFrame:
+def _detect_boxes(m30: pd.DataFrame) -> tuple[pd.DataFrame, int, list]:
     """
     Hybrid one-pass / two-pass M30 box detection.
     Exact copy of m30_box_detection.detect_boxes() -- kept here to avoid
@@ -208,6 +219,14 @@ def _detect_boxes(m30: pd.DataFrame) -> pd.DataFrame:
 
     Parameters: CONTRACTION_THR=1.2, MIN_BARS=3,
                 MAX_BREAKOUT_WAIT=20, MAX_JAC_WAIT=40
+                BOX_EXPIRY_K_ATR=2.0   (P1.3 stagnation rule)
+
+    Returns
+    -------
+    (m30_with_box_columns, box_counter, expirations)
+      expirations : list[dict] — one entry per BOX_EXPIRED event detected
+                    in chronological order. Used by run_update() to write
+                    BOX_EXPIRED telemetry to decision_log (P0 schema).
 
     Liq semantics — UPDATED 2026-04-28 (M30-BIAS-DERIVATION-AUDIT
     Asana 1214320481337073, Opção 2):
@@ -222,29 +241,45 @@ def _detect_boxes(m30: pd.DataFrame) -> pd.DataFrame:
         min(low) DURING THE BOX'S ENTIRE LIFESPAN (from breakout_idx
         through subsequent bars while the box_id remains active).
         Aligns with classical Wyckoff "liquidity grab" semantics.
+
+    Box stagnation rule (P1.3, Asana 1214327736913830, 2026-04-28):
+        At each forward-filled bar of an active confirmed box, compute
+        edge-excursion = max(close - box_high, box_low - close, 0).
+        If edge-excursion > BOX_EXPIRY_K_ATR (=2.0) × atr_at_creation,
+        the box is expired in-place: the current bar (and subsequent
+        ones until a fresh contraction forms) shows no active box.
+        Calibration: Phase 2 backtest 10mo L2, family-of-4 Bonferroni
+        winner p=0.012, +247 pts/month recovery (5:1 R:R). Captures
+        the 2026-04-28 04:08 "Box 5261 stuck" trigger case (~3×ATR /
+        7h08m). See _audit/M30_BOX_STAGNATION_BACKTEST.md.
     """
     n        = len(m30)
     high_a   = m30["high"].values.copy()
     low_a    = m30["low"].values.copy()
     close_a  = m30["close"].values.copy()
     atr_a    = m30["atr14"].values.copy()
+    ts_a     = m30.index.values  # numpy datetime64 array for log timestamps
 
-    out_liq_top   = np.full(n, np.nan)
-    out_liq_bot   = np.full(n, np.nan)
-    out_fmv       = np.full(n, np.nan)
-    out_box_high  = np.full(n, np.nan)
-    out_box_low   = np.full(n, np.nan)
-    out_confirmed = np.zeros(n, dtype=bool)
-    out_box_id    = np.zeros(n, dtype=np.int32)
+    out_liq_top      = np.full(n, np.nan)
+    out_liq_bot      = np.full(n, np.nan)
+    out_fmv          = np.full(n, np.nan)
+    out_box_high     = np.full(n, np.nan)
+    out_box_low      = np.full(n, np.nan)
+    out_confirmed    = np.zeros(n, dtype=bool)
+    out_box_id       = np.zeros(n, dtype=np.int32)
+    out_atr_creation = np.full(n, np.nan)   # P1.3: per-row ATR-at-creation for the active box
 
-    cur_liq_top   = np.nan
-    cur_liq_bot   = np.nan
-    cur_fmv       = np.nan
-    cur_box_high  = np.nan
-    cur_box_low   = np.nan
-    cur_confirmed = False
-    cur_box_id    = 0
-    box_counter   = 0
+    cur_liq_top         = np.nan
+    cur_liq_bot         = np.nan
+    cur_fmv             = np.nan
+    cur_box_high        = np.nan
+    cur_box_low         = np.nan
+    cur_confirmed       = False
+    cur_box_id          = 0
+    cur_atr_at_creation = np.nan          # P1.3 — captured at box creation
+    cur_box_first_idx   = -1              # P1.3 — for age computation in expiry log
+    box_counter         = 0
+    expirations: list[dict] = []          # P1.3 — chronological list of BOX_EXPIRED events
 
     i = MIN_BARS + 14   # skip ATR warmup
     while i < n:
@@ -252,22 +287,68 @@ def _detect_boxes(m30: pd.DataFrame) -> pd.DataFrame:
 
         # Forward-fill current levels (and update liq excursion if box still alive)
         if not np.isnan(cur_liq_top):
+            # P1.3 stagnation expiry — A K=2 rule. Check BEFORE liq update / writes.
+            # Only confirmed boxes (cur_box_id > 0 AND atr_at_creation set) participate.
+            if cur_box_id > 0 and not np.isnan(cur_atr_at_creation):
+                bar_close = close_a[i]
+                if not np.isnan(bar_close):
+                    edge_excursion = max(
+                        bar_close - cur_box_high,
+                        cur_box_low  - bar_close,
+                        0.0,
+                    )
+                    threshold = BOX_EXPIRY_K_ATR * cur_atr_at_creation
+                    if edge_excursion > threshold:
+                        # Record expiration for telemetry
+                        expired_at = pd.Timestamp(ts_a[i])
+                        first_ts   = pd.Timestamp(ts_a[cur_box_first_idx])
+                        age_h      = max(
+                            (expired_at - first_ts).total_seconds() / 3600.0, 0.0
+                        )
+                        expirations.append({
+                            "box_id":          int(cur_box_id),
+                            "expired_at":      expired_at,
+                            "first_ts":        first_ts,
+                            "age_h":           round(age_h, 2),
+                            "box_high":        float(cur_box_high),
+                            "box_low":         float(cur_box_low),
+                            "box_midpoint":    float(cur_fmv),
+                            "close_at_expiry": float(bar_close),
+                            "edge_excursion":  round(float(edge_excursion), 2),
+                            "threshold":       round(float(threshold), 2),
+                            "atr_at_creation": round(float(cur_atr_at_creation), 2),
+                            "k_atr":           BOX_EXPIRY_K_ATR,
+                        })
+                        # Reset box state — current bar (and subsequent ones until
+                        # a new contraction forms) shows no active box.
+                        cur_liq_top         = np.nan
+                        cur_liq_bot         = np.nan
+                        cur_fmv             = np.nan
+                        cur_box_high        = np.nan
+                        cur_box_low         = np.nan
+                        cur_confirmed       = False
+                        cur_box_id          = 0
+                        cur_atr_at_creation = np.nan
+                        cur_box_first_idx   = -1
+                        # Fall through to contraction detection at i (no writes for this bar).
             # Per "true excursion during box life" semantics (2026-04-28 fix):
             # extend cur_liq_top / cur_liq_bot to include this bar's high/low.
-            if cur_box_id > 0:
+            if cur_box_id > 0 and not np.isnan(cur_liq_top):
                 bar_hi = high_a[i]
                 bar_lo = low_a[i]
                 if not np.isnan(bar_hi) and bar_hi > cur_liq_top:
                     cur_liq_top = float(bar_hi)
                 if not np.isnan(bar_lo) and bar_lo < cur_liq_bot:
                     cur_liq_bot = float(bar_lo)
-            out_liq_top[i]   = cur_liq_top
-            out_liq_bot[i]   = cur_liq_bot
-            out_fmv[i]       = cur_fmv
-            out_box_high[i]  = cur_box_high
-            out_box_low[i]   = cur_box_low
-            out_confirmed[i] = cur_confirmed
-            out_box_id[i]    = cur_box_id
+            if not np.isnan(cur_liq_top):
+                out_liq_top[i]      = cur_liq_top
+                out_liq_bot[i]      = cur_liq_bot
+                out_fmv[i]          = cur_fmv
+                out_box_high[i]     = cur_box_high
+                out_box_low[i]      = cur_box_low
+                out_confirmed[i]    = cur_confirmed
+                out_box_id[i]       = cur_box_id
+                out_atr_creation[i] = cur_atr_at_creation
 
         if np.isnan(atr) or atr <= 0:
             i += 1
@@ -328,14 +409,19 @@ def _detect_boxes(m30: pd.DataFrame) -> pd.DataFrame:
         cur_box_low  = float(b_lo)
         cur_confirmed = False
         cur_box_id   = box_counter
+        # P1.3: capture ATR at the contraction-end bar (i) for the expiry threshold.
+        # This is "atr_at_creation" — fixed for the box's lifetime.
+        cur_atr_at_creation = float(atr_a[i]) if not np.isnan(atr_a[i]) else np.nan
+        cur_box_first_idx   = breakout_idx
 
-        out_liq_top[breakout_idx]   = cur_liq_top
-        out_liq_bot[breakout_idx]   = cur_liq_bot
-        out_fmv[breakout_idx]       = cur_fmv
-        out_box_high[breakout_idx]  = cur_box_high
-        out_box_low[breakout_idx]   = cur_box_low
-        out_confirmed[breakout_idx] = False
-        out_box_id[breakout_idx]    = cur_box_id
+        out_liq_top[breakout_idx]      = cur_liq_top
+        out_liq_bot[breakout_idx]      = cur_liq_bot
+        out_fmv[breakout_idx]          = cur_fmv
+        out_box_high[breakout_idx]     = cur_box_high
+        out_box_low[breakout_idx]      = cur_box_low
+        out_confirmed[breakout_idx]    = False
+        out_box_id[breakout_idx]       = cur_box_id
+        out_atr_creation[breakout_idx] = cur_atr_at_creation
 
         # Scan forward for JAC confirmation
         jac_found = False
@@ -347,13 +433,14 @@ def _detect_boxes(m30: pd.DataFrame) -> pd.DataFrame:
                 cur_liq_top = float(bar_hi_k)
             if not np.isnan(bar_lo_k) and bar_lo_k < cur_liq_bot:
                 cur_liq_bot = float(bar_lo_k)
-            out_liq_top[k]   = cur_liq_top
-            out_liq_bot[k]   = cur_liq_bot
-            out_fmv[k]       = cur_fmv
-            out_box_high[k]  = cur_box_high
-            out_box_low[k]   = cur_box_low
-            out_confirmed[k] = False
-            out_box_id[k]    = cur_box_id
+            out_liq_top[k]      = cur_liq_top
+            out_liq_bot[k]      = cur_liq_bot
+            out_fmv[k]          = cur_fmv
+            out_box_high[k]     = cur_box_high
+            out_box_low[k]      = cur_box_low
+            out_confirmed[k]    = False
+            out_box_id[k]       = cur_box_id
+            out_atr_creation[k] = cur_atr_at_creation
 
             if breakout_dir == "UP" and close_a[k] > b_hi:
                 log.info("[PHASE_FIX] old=close<b_lo new=close>b_hi reason=JAC_corrected box_id=%d k=%d", cur_box_id, k)
@@ -374,13 +461,14 @@ def _detect_boxes(m30: pd.DataFrame) -> pd.DataFrame:
             i = breakout_idx + 1
 
     m30 = m30.copy()
-    m30["m30_liq_top"]       = out_liq_top
-    m30["m30_liq_bot"]       = out_liq_bot
-    m30["m30_fmv"]           = out_fmv
-    m30["m30_box_high"]      = out_box_high
-    m30["m30_box_low"]       = out_box_low
-    m30["m30_box_confirmed"] = out_confirmed
-    m30["m30_box_id"]        = out_box_id
+    m30["m30_liq_top"]              = out_liq_top
+    m30["m30_liq_bot"]              = out_liq_bot
+    m30["m30_fmv"]                  = out_fmv
+    m30["m30_box_high"]             = out_box_high
+    m30["m30_box_low"]              = out_box_low
+    m30["m30_box_confirmed"]        = out_confirmed
+    m30["m30_box_id"]               = out_box_id
+    m30["m30_box_atr_at_creation"]  = out_atr_creation
 
     tol = m30["atr14"] * AT_STRUCT_TOL
     near_top = ((m30["close"] - m30["m30_liq_top"]).abs() <= tol).fillna(False)
@@ -388,7 +476,7 @@ def _detect_boxes(m30: pd.DataFrame) -> pd.DataFrame:
     near_fmv = ((m30["close"] - m30["m30_fmv"]).abs()     <= tol).fillna(False)
     m30["at_struct_level"] = near_top | near_bot | near_fmv
 
-    return m30, box_counter
+    return m30, box_counter, expirations
 
 
 # ---------------------------------------------------------------------------
@@ -409,6 +497,107 @@ def _write_atomic(m30: pd.DataFrame) -> None:
                 import time as _t
                 _t.sleep(0.5)
     log.warning("M30 write: rename failed after 3 attempts (file locked by reader)")
+
+
+# ---------------------------------------------------------------------------
+# P1.3 — BOX_EXPIRED telemetry (decision_log P0 schema)
+# ---------------------------------------------------------------------------
+
+def _emit_box_expired_telemetry(expirations: list, last_logged_before_ts) -> int:
+    """Append BOX_EXPIRED MUTATE rows to decision_log.jsonl using the canonical
+    P0 OBSERVABILITY-LOG-BLOCKS schema (Asana 1214327559721560).
+
+    Parameters
+    ----------
+    expirations : list[dict]
+        chronological list of expiry events from `_detect_boxes`
+    last_logged_before_ts : pandas.Timestamp | None
+        Timestamp of the previous parquet's last bar. Only expirations whose
+        `expired_at` is STRICTLY AFTER this are logged this cycle (avoids
+        re-logging the entire 10-month history on every 30-min update).
+
+    Returns
+    -------
+    int — number of rows appended to decision_log.jsonl this call.
+    """
+    if not expirations:
+        return 0
+    # Filter to "new since last cycle"
+    if last_logged_before_ts is not None:
+        if last_logged_before_ts.tzinfo is None:
+            last_logged_before_ts = last_logged_before_ts.tz_localize("UTC")
+        new_events = [e for e in expirations
+                       if pd.Timestamp(e["expired_at"]) > last_logged_before_ts]
+    else:
+        # First-ever run — log only the most recent expiration to avoid
+        # spamming the log with historical events from the parquet rebuild.
+        new_events = expirations[-1:] if expirations else []
+
+    if not new_events:
+        return 0
+
+    n_written = 0
+    try:
+        DECISION_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(DECISION_LOG_PATH, "a", encoding="utf-8") as f:
+            for ev in new_events:
+                expired_ts = pd.Timestamp(ev["expired_at"])
+                if expired_ts.tzinfo is None:
+                    expired_ts = expired_ts.tz_localize("UTC")
+                row = {
+                    "timestamp":      expired_ts.isoformat(),
+                    "decision_id":    str(uuid.uuid4())[:8],
+                    "decision_frame": "GC",
+                    "price_gc":       round(ev["close_at_expiry"], 2),
+                    "decision": {
+                        "action":               "MUTATE",
+                        "reason_code":          "BOX_EXPIRED_EXCURSION",
+                        "direction":            "NEUTRAL",
+                        "block_detail": (
+                            f"Box {ev['box_id']} expired: "
+                            f"excursion={ev['edge_excursion']}pts > "
+                            f"{ev['k_atr']}xATR_at_creation={ev['threshold']}pts "
+                            f"(age={ev['age_h']}h, atr@creation={ev['atr_at_creation']})"
+                        ),
+                        "trigger_source":       "M30_BOX_EXPIRY_RULE",
+                        "trigger_level_type":   "box_midpoint",
+                        "trigger_level_gc":     round(ev["box_midpoint"], 2),
+                        "trigger_proximity_gc": round(ev["edge_excursion"], 2),
+                    },
+                    "context": {
+                        "phase":             "M30_UPDATE",
+                        "m30_bias":          "unknown",
+                        "m30_bias_confirmed": False,
+                        "session":           _session_for_ts(expired_ts),
+                        "delta_4h":          None,
+                        "atr_m30":           ev["atr_at_creation"],
+                        "box_id":            ev["box_id"],
+                        "box_high":          ev["box_high"],
+                        "box_low":           ev["box_low"],
+                        "age_h":             ev["age_h"],
+                    },
+                    "gate_state":              None,
+                    "coalesce_count":          1,
+                    "coalesce_first_ts":       None,
+                    "coalesce_window_seconds": None,
+                }
+                f.write(json.dumps(row, default=str) + "\n")
+                n_written += 1
+    except Exception as e:
+        log.warning("BOX_EXPIRED telemetry write failed: %s", e)
+    return n_written
+
+
+def _session_for_ts(ts) -> str:
+    """Map UTC hour to session label — matches event_processor._obs_context_snapshot."""
+    h = pd.Timestamp(ts).hour
+    if 14 <= h < 21:
+        return "ny"
+    if 8 <= h < 14:
+        return "london"
+    if (20 <= h < 24) or (0 <= h < 2):
+        return "asian"
+    return "off-hours"
 
 
 # ---------------------------------------------------------------------------
@@ -443,17 +632,27 @@ def run_update(micro_dir: Path = MICRO_DIR) -> dict:
         log.warning("M1 parquet persist failed: %s", _e)
 
     m30_base = _m1_to_m30_base(m1)
-    m30, n_boxes = _detect_boxes(m30_base)
+    m30, n_boxes, expirations = _detect_boxes(m30_base)
 
-    # Read previous last box_id for change detection
+    # Read previous last box_id and last logged expiry for change detection
     prev_box_id = 0
+    prev_last_expired_ts = None
     try:
         prev = pd.read_parquet(OUTPUT_M30, columns=["m30_box_id"])
         prev_box_id = int(prev["m30_box_id"].max())
+        # Sniff the previous parquet's last bar timestamp to determine which
+        # expirations are "new" since the last update cycle.
+        prev_last_bar_ts = prev.index[-1] if len(prev) else None
+        prev_last_expired_ts = prev_last_bar_ts
     except Exception:
         pass
 
     _write_atomic(m30)
+
+    # P1.3 BOX_EXPIRED telemetry — emit MUTATE rows for expirations that
+    # occurred AFTER the previous parquet's last bar (= new since last cycle).
+    n_box_expired_logged = _emit_box_expired_telemetry(expirations, prev_last_expired_ts)
+
     elapsed = time.monotonic() - t0
 
     # Summary
@@ -473,6 +672,9 @@ def run_update(micro_dir: Path = MICRO_DIR) -> dict:
         "last_fmv":     round(float(m30["m30_fmv"].iloc[-1]),     2) if n_boxes else 0,
         "confirmed_boxes": int(confirmed["m30_box_id"].nunique()) if not confirmed.empty else 0,
         "last_confirmed_id": int(confirmed["m30_box_id"].iloc[-1]) if not confirmed.empty else 0,
+        # P1.3 stagnation rule
+        "n_box_expirations_total":   len(expirations),
+        "n_box_expired_logged_now":  n_box_expired_logged,
     }
 
     if new_boxes > 0:
