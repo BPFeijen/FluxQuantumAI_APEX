@@ -791,16 +791,19 @@ def _run_event_driven(args) -> None:
     elif not args.no_updaters:
         print(_color("WARNING: M30 Updater not available -- m30_bias will be unknown", _YELLOW))
 
-    # --- D1/H4 Bias Engine (FASE 4a shadow -- DISABLED) ---
-    # DISABLED 2026-04-14: full M1 reload (2.2M rows) every 5min was degrading
-    # server performance (1GB RAM, 90% CPU). Needs incremental/event-driven redesign.
-    # Shadow bias still readable from gc_d1h4_bias.json (last standalone run).
-    # TODO: redesign as incremental updater that only processes new bars.
-    # if not args.no_updaters and _start_d1h4_updater is not None:
-    #     _get_dt = lambda: getattr(processor, "daily_trend", "unknown")
-    #     _start_d1h4_updater(get_daily_trend_fn=_get_dt)
-    #     print(_color("D1H4 Updater started (300s cadence, SHADOW MODE)", _CYAN))
-    print(_color("D1H4 Updater DISABLED (perf issue -- awaiting incremental redesign)", _YELLOW))
+    # --- D1/H4 Bias Engine (FASE 4a shadow -- RE-ENABLED) ---
+    # Re-enabled 2026-04-29 per STALE-D1H4-001 (Asana 1214284204948063).
+    # The 1 GB RAM / 90 % CPU regression that caused the 2026-04-21 disable
+    # (commit 3e80ed6) has been addressed via windowed rebuild: 60-day
+    # pyarrow predicate pushdown + DATA-002 trades.price source. Per-cycle
+    # CPU < 5 s, memory < 50 MB. Cadence 300 s (unchanged).
+    # See `_audit/design/D1H4_UPDATER_INCREMENTAL.md` for full design.
+    if not args.no_updaters and _start_d1h4_updater is not None:
+        _get_dt = lambda: getattr(processor, "daily_trend", "unknown")
+        _start_d1h4_updater(get_daily_trend_fn=_get_dt)
+        print(_color("D1H4 Updater started (300s cadence, SHADOW MODE)", _CYAN))
+    elif not args.no_updaters:
+        print(_color("WARNING: D1H4 Updater not available -- d1h4_bias will be stale", _YELLOW))
 
     # --- Layer 4: PositionMonitor (background thread) ---
     if _executor is not None:

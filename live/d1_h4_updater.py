@@ -67,6 +67,13 @@ OUTPUT_H4  = DATA_DIR / "processed/gc_h4_boxes.parquet"
 OUTPUT_D1  = DATA_DIR / "processed/gc_d1_boxes.parquet"
 OUTPUT_BIAS = Path("C:/FluxQuantumAI/logs/gc_d1h4_bias.json")
 
+# STALE-D1H4-001 (Asana 1214284204948063) — windowed rebuild design.
+# Rationale: full rebuild caused 1 GB RAM / 90 % CPU per Barbara 2026-04-21
+# (commit 3e80ed6). Windowed read bounds memory + CPU while preserving the
+# exact same _detect_boxes / _derive_jac_dir output. See
+# `_audit/design/D1H4_UPDATER_INCREMENTAL.md` for full design.
+WINDOW_DAYS = 60
+
 # Session boundary: GC futures daily close = 22:00 UTC (17:00 ET)
 SESSION_OFFSET = "22h"
 
@@ -107,55 +114,120 @@ D1_OUTPUT_COLS = [
 
 
 # ---------------------------------------------------------------------------
-# Step 1 — build M1 (same as m30_updater)
+# Step 1 — build M1 (windowed; DATA-002 P1 carried over)
+# ---------------------------------------------------------------------------
+#
+# DATA-002 P1 fix (2026-04-25, commit 1eda7ab) replaced microstructure
+# `mid_price` with executed-trades `price` for OHLC reconstruction. The
+# m30_updater absorbed the fix; this updater (disabled 2026-04-21, commit
+# 3e80ed6) did not. STALE-D1H4-001 carries the fix forward — `_trades_to_m1`
+# below is a direct port of `m30_updater._trades_to_m1` (lines 72-107).
+# Reading mid_price would silently undershoot/overshoot tape by 30+ pt
+# during fast moves (forensic in `_audit/pp_sprint/DATA-002_P1_root_cause_briefback.md`).
 # ---------------------------------------------------------------------------
 
-def _micro_to_m1(micro_path: Path) -> pd.DataFrame | None:
-    """Reconstruct M1 OHLCV from today's live microstructure file."""
-    if not micro_path.exists():
+def _trades_to_m1(trades_path: Path) -> pd.DataFrame | None:
+    """Reconstruct M1 OHLCV from executed-trades tape (trades_*.csv.gz).
+    Uses price + size of executed trades — authoritative vs the live tape,
+    not a book-midpoint derivative. DATA-002 P1 carryover from m30_updater.
+
+    Returns None if file missing or no usable data.
+    """
+    if not trades_path.exists():
+        log.debug("Trades file not found: %s", trades_path)
         return None
     try:
-        micro = pd.read_csv(
-            micro_path,
-            usecols=["timestamp", "mid_price", "bar_delta"],
-            dtype={"mid_price": "float64", "bar_delta": "float64"},
+        trades = pd.read_csv(
+            trades_path,
+            usecols=["timestamp", "price", "size"],
+            dtype={"price": "float64", "size": "float64"},
         )
-        micro["timestamp"] = pd.to_datetime(micro["timestamp"], utc=True)
-        micro = micro.dropna(subset=["mid_price", "timestamp"])
-        micro = micro.set_index("timestamp").sort_index()
-        if micro.empty:
+        trades["timestamp"] = pd.to_datetime(trades["timestamp"], utc=True)
+        trades = trades.dropna(subset=["price", "timestamp"])
+        trades = trades.set_index("timestamp").sort_index()
+        if trades.empty:
             return None
-        m1 = micro["mid_price"].resample("1min").ohlc()
+        m1 = trades["price"].resample("1min").ohlc()
         m1.columns = ["open", "high", "low", "close"]
-        m1["volume"] = micro["bar_delta"].abs().resample("1min").sum()
+        m1["volume"] = trades["size"].resample("1min").sum()
         m1 = m1.dropna(subset=["close"])
         return m1
     except Exception as e:
-        log.error("_micro_to_m1 failed: %s", e)
+        log.error("_trades_to_m1 failed: %s", e)
         return None
 
 
-def _build_m1() -> pd.DataFrame:
-    """Load historical M1 and append today's live M1."""
-    hist = pd.read_parquet(M1_PATH, columns=["open", "high", "low", "close", "volume"])
+def _build_m1_windowed() -> pd.DataFrame:
+    """Read only the last WINDOW_DAYS of M1 from gc_ohlcv_l2_joined.parquet
+    via pyarrow filter pushdown, then append today's trades-derived M1 bars.
+
+    STALE-D1H4-001 windowed rebuild — Phase 1b. Replaces the prior full-load
+    `_build_m1()` (which loaded 2.2M rows × every cycle = 1 GB RAM, 90 % CPU
+    per Barbara's diagnosis at disable time). Bounded memory ~10 MB, bounded
+    CPU < 1 s per cycle.
+
+    Falls back to full-read + pandas slice if pyarrow filters unavailable.
+    """
+    cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=WINDOW_DAYS)
+
+    # Primary path: pyarrow predicate pushdown.
+    # Note: parquet's index column is `timestamp` (named); pyarrow returns it
+    # as a regular column. We re-index to DatetimeIndex tz-aware UTC, mirroring
+    # what `pd.read_parquet(...)` would do.
+    try:
+        import pyarrow.parquet as pq
+        table = pq.read_table(
+            M1_PATH,
+            columns=["timestamp", "open", "high", "low", "close", "volume"],
+            filters=[("timestamp", ">=", cutoff)],
+        )
+        hist = table.to_pandas()
+        if "timestamp" in hist.columns:
+            hist["timestamp"] = pd.to_datetime(hist["timestamp"], utc=True)
+            hist = hist.set_index("timestamp").sort_index()
+    except Exception as e:
+        # Fallback: full read + slice (still works; loses memory bound but
+        # acceptable as one-time degradation)
+        log.warning("pyarrow filter pushdown unavailable (%s); falling back "
+                    "to full-read + slice", e)
+        hist = pd.read_parquet(
+            M1_PATH, columns=["open", "high", "low", "close", "volume"]
+        )
+        if hist.index.tz is None:
+            hist.index = hist.index.tz_localize("UTC")
+        hist = hist[hist.index >= cutoff]
+
     if hist.index.tz is None:
         hist.index = hist.index.tz_localize("UTC")
 
+    # Append today's M1 from trades.price (DATA-002 P1)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    micro_path = MICRO_DIR / f"microstructure_{today}.csv.gz"
-    m1_today = _micro_to_m1(micro_path)
+    trades_path = MICRO_DIR / f"trades_{today}.csv.gz"
+    if not trades_path.exists():
+        # m30_updater fallback convention
+        alt = MICRO_DIR / f"trades_{today}.fixed.csv.gz"
+        if alt.exists():
+            trades_path = alt
 
-    if m1_today is not None:
+    m1_today = _trades_to_m1(trades_path)
+
+    if m1_today is not None and not m1_today.empty:
         if m1_today.index.tz is None:
             m1_today.index = m1_today.index.tz_localize("UTC")
-        last_hist_ts = hist.index[-1]
-        m1_today = m1_today[m1_today.index > last_hist_ts]
+        if len(hist):
+            last_hist_ts = hist.index[-1]
+            m1_today = m1_today[m1_today.index > last_hist_ts]
         if not m1_today.empty:
             combined = pd.concat([hist, m1_today]).sort_index()
             combined = combined[~combined.index.duplicated(keep="first")]
             return combined
 
     return hist
+
+
+# Backwards-compat alias so any caller importing _build_m1 still works.
+# Tests / scripts that call this directly will get the windowed behaviour.
+_build_m1 = _build_m1_windowed
 
 
 # ---------------------------------------------------------------------------
@@ -457,8 +529,8 @@ def run_update() -> dict:
     t0 = time.monotonic()
     now_utc = datetime.now(timezone.utc)
 
-    # Step 1: build M1
-    m1 = _build_m1()
+    # Step 1: build M1 (windowed — STALE-D1H4-001 Phase 1b)
+    m1 = _build_m1_windowed()
 
     # Step 2: resample
     h4_base = _resample_to_tf(m1, "4h")
