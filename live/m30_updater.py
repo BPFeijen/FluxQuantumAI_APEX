@@ -258,7 +258,9 @@ def _detect_boxes(m30: pd.DataFrame) -> tuple[pd.DataFrame, int, list]:
     low_a    = m30["low"].values.copy()
     close_a  = m30["close"].values.copy()
     atr_a    = m30["atr14"].values.copy()
-    ts_a     = m30.index.values  # numpy datetime64 array for log timestamps
+    # Keep the DatetimeIndex (tz-aware) for expiration timestamps —
+    # m30.index.values is numpy datetime64 which loses tz.
+    ts_idx   = m30.index
 
     out_liq_top      = np.full(n, np.nan)
     out_liq_bot      = np.full(n, np.nan)
@@ -299,9 +301,10 @@ def _detect_boxes(m30: pd.DataFrame) -> tuple[pd.DataFrame, int, list]:
                     )
                     threshold = BOX_EXPIRY_K_ATR * cur_atr_at_creation
                     if edge_excursion > threshold:
-                        # Record expiration for telemetry
-                        expired_at = pd.Timestamp(ts_a[i])
-                        first_ts   = pd.Timestamp(ts_a[cur_box_first_idx])
+                        # Record expiration for telemetry. Preserve tz from
+                        # the DatetimeIndex (UTC) — numpy datetime64 loses tz.
+                        expired_at = ts_idx[i]
+                        first_ts   = ts_idx[cur_box_first_idx]
                         age_h      = max(
                             (expired_at - first_ts).total_seconds() / 3600.0, 0.0
                         )
@@ -522,12 +525,19 @@ def _emit_box_expired_telemetry(expirations: list, last_logged_before_ts) -> int
     """
     if not expirations:
         return 0
+
+    def _to_utc(ts):
+        """Coerce ts to a tz-aware UTC pandas.Timestamp."""
+        t = pd.Timestamp(ts)
+        if t.tzinfo is None:
+            t = t.tz_localize("UTC")
+        return t
+
     # Filter to "new since last cycle"
     if last_logged_before_ts is not None:
-        if last_logged_before_ts.tzinfo is None:
-            last_logged_before_ts = last_logged_before_ts.tz_localize("UTC")
+        last_logged_before_ts = _to_utc(last_logged_before_ts)
         new_events = [e for e in expirations
-                       if pd.Timestamp(e["expired_at"]) > last_logged_before_ts]
+                       if _to_utc(e["expired_at"]) > last_logged_before_ts]
     else:
         # First-ever run — log only the most recent expiration to avoid
         # spamming the log with historical events from the parquet rebuild.
@@ -541,9 +551,7 @@ def _emit_box_expired_telemetry(expirations: list, last_logged_before_ts) -> int
         DECISION_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(DECISION_LOG_PATH, "a", encoding="utf-8") as f:
             for ev in new_events:
-                expired_ts = pd.Timestamp(ev["expired_at"])
-                if expired_ts.tzinfo is None:
-                    expired_ts = expired_ts.tz_localize("UTC")
+                expired_ts = _to_utc(ev["expired_at"])
                 row = {
                     "timestamp":      expired_ts.isoformat(),
                     "decision_id":    str(uuid.uuid4())[:8],

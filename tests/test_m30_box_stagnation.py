@@ -273,3 +273,40 @@ def test_box_expiry_does_not_affect_already_expired():
         f"duplicate box_id in expirations: {expired_ids}"
     # The single original box should appear at most once
     assert expired_ids.count(1) <= 1
+
+
+# ---------------------------------------------------------------------------
+# Test 7 (regression) — end-to-end: _detect_boxes → _emit_box_expired_telemetry
+# pipeline must not raise on tz-naive vs tz-aware comparison.
+# ---------------------------------------------------------------------------
+
+def test_detect_boxes_telemetry_e2e_tz_safe(tmp_path, monkeypatch):
+    """End-to-end pipeline: build a tz-aware m30 dataframe, run `_detect_boxes`,
+    then pass the expirations list straight into `_emit_box_expired_telemetry`.
+    Must not raise (regression for the tz-naive vs tz-aware bug found at
+    first live deploy 2026-04-28T12:03 UTC)."""
+    log_path = tmp_path / "decision_log.jsonl"
+    monkeypatch.setattr(m30_mod, "DECISION_LOG_PATH", log_path)
+
+    df = _make_box_then_drift(initial_drift_pts=4 * 2.0, n_drift_bars=8,
+                                atr=2.0, base=4700.0)
+    assert df.index.tz is not None, "test fixture must be tz-aware"
+
+    out, n_boxes, expirations = _detect_boxes(df)
+    assert len(expirations) >= 1, "expected at least one expiration"
+    # All expired_at must be tz-aware
+    for e in expirations:
+        assert pd.Timestamp(e["expired_at"]).tzinfo is not None, \
+            f"expired_at must be tz-aware, got {e['expired_at']}"
+
+    # last_logged_before_ts both tz-aware AND tz-naive must work.
+    aware_ref = pd.Timestamp("2025-12-01", tz="UTC")
+    n_a = _emit_box_expired_telemetry(expirations, aware_ref)
+    naive_ref = pd.Timestamp("2025-12-01")
+    n_n = _emit_box_expired_telemetry(expirations, naive_ref)
+    none_ref = None
+    n_none = _emit_box_expired_telemetry(expirations, none_ref)
+    # Each call appends rows without raising. Sums logged.
+    assert (n_a + n_n + n_none) >= 1
+    rows = log_path.read_text(encoding="utf-8").splitlines()
+    assert len(rows) >= 1
