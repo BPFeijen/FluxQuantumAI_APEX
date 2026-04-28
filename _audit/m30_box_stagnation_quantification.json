@@ -1,0 +1,187 @@
+{
+  "stuck_box_summary": {
+    "total_boxes": 684,
+    "window": "2025-07-01T00:00:00+00:00 -> 2026-04-28T00:00:00+00:00",
+    "duration_h_percentiles": {
+      "p50": 5.5,
+      "p75": 10.0,
+      "p90": 17.0,
+      "p95": 35.92500000000001,
+      "p99": 58.66999999999996
+    },
+    "duration_h_mean": 9.139619883040936,
+    "duration_h_max": 154.0,
+    "n_boxes_duration_gt_2h": 529,
+    "n_boxes_duration_gt_4h": 416,
+    "n_boxes_duration_gt_6h": 299,
+    "n_boxes_duration_gt_8h": 217,
+    "n_boxes_duration_gt_12h": 130,
+    "n_boxes_duration_gt_24h": 39,
+    "n_stuck_4h": 416,
+    "stuck_4h_excursion_atr_percentiles": {
+      "p50": 2.3270219682354765,
+      "p75": 4.212776757749189,
+      "p90": 6.730327279697171,
+      "p95": 8.512556676010824,
+      "p99": 14.10223592426497
+    },
+    "n_stuck_4h_excursion_gt_2atr": 237,
+    "n_stuck_4h_excursion_gt_3atr": 170,
+    "n_stuck_4h_excursion_gt_4atr": 119,
+    "n_stuck_4h_excursion_gt_5atr": 83,
+    "top10_extreme_stuck": [
+      {
+        "box_id": 5182,
+        "first_ts": "2026-03-19T05:30:00+00:00",
+        "last_ts": "2026-03-19T15:00:00+00:00",
+        "duration_h": 9.5,
+        "box_range_pts": 14.3,
+        "max_excursion_pts": 269.8,
+        "excursion_over_range": 18.87,
+        "excursion_over_atr": 21.53,
+        "atr_at_birth": 12.53
+      },
+      {
+        "box_id": 5177,
+        "first_ts": "2026-03-18T00:00:00+00:00",
+        "last_ts": "2026-03-18T15:30:00+00:00",
+        "duration_h": 15.5,
+        "box_range_pts": 17.5,
+        "max_excursion_pts": 131.7,
+        "excursion_over_range": 7.53,
+        "excursion_over_atr": 18.5,
+        "atr_at_birth": 7.12
+      },
+      {
+        "box_id": 4721,
+        "first_ts": "2025-08-29T00:00:00+00:00",
+        "last_ts": "2025-08-29T17:30:00+00:00",
+        "duration_h": 17.5,
+        "box_range_pts": 6.9,
+        "max_excursion_pts": 38.8,
+        "excursion_over_range": 5.62,
+        "excursion_over_atr": 16.46,
+        "atr_at_birth": 2.36
+      },
+      {
+        "box_id": 4846,
+        "first_ts": "2025-10-21T01:00:00+00:00",
+        "last_ts": "2025-10-21T18:00:00+00:00",
+        "duration_h": 17.0,
+        "box_range_pts": 15.8,
+        "max_excursion_pts": 242.6,
+        "excursion_over_range": 15.35,
+        "excursion_over_atr": 16.05,
+        "atr_at_birth": 15.11
+      },
+      {
+        "box_id": 5017,
+        "first_ts": "2025-12-28T23:00:00+00:00",
+        "last_ts": "2025-12-29T17:00:00+00:00",
+        "duration_h": 18.0,
+        "box_range_pts": 16.5,
+        "max_excursion_pts": 203.9,
+        "excursion_over_range": 12.36,
+        "excursion_over_atr": 14.22,
+        "atr_at_birth": 14.34
+      },
+      {
+        "box_id": 5158,
+        "first_ts": "2026-03-03T04:00:00+00:00",
+        "last_ts": "2026-03-04T22:30:00+00:00",
+        "duration_h": 42.5,
+        "box_range_pts": 17.5,
+        "max_excursion_pts": 234.6,
+        "excursion_over_range": 13.37,
+        "excursion_over_atr": 13.42,
+        "atr_at_birth": 17.49
+      },
+      {
+        "box_id": 4948,
+        "first_ts": "2025-11-27T18:30:00+00:00",
+        "last_ts": "2025-11-28T19:30:00+00:00",
+        "duration_h": 25.0,
+        "box_range_pts": 5.5,
+        "max_excursion_pts": 64.7,
+        "excursion_over_range": 11.76,
+        "excursion_over_atr": 12.83,
+        "atr_at_birth": 5.04
+      },
+      {
+        "box_id": 4630,
+        "first_ts": "2025-07-22T11:30:00+00:00",
+        "last_ts": "2025-07-22T17:00:00+00:00",
+        "duration_h": 5.5,
+        "box_range_pts": 3.8,
+        "max_excursion_pts": 47.6,
+        "excursion_over_range": 12.53,
+        "excursion_over_atr": 12.74,
+        "atr_at_birth": 3.74
+      },
+      {
+        "box_id": 5112,
+        "first_ts": "2026-02-12T12:30:00+00:00",
+        "last_ts": "2026-02-12T19:00:00+00:00",
+        "duration_h": 6.5,
+        "box_range_pts": 12.6,
+        "max_excursion_pts": 160.1,
+        "excursion_over_range": 12.76,
+        "excursion_over_atr": 12.41,
+        "atr_at_birth": 12.9
+      },
+      {
+        "box_id": 4706,
+        "first_ts": "2025-08-22T10:30:00+00:00",
+        "last_ts": "2025-08-22T17:00:00+00:00",
+        "duration_h": 6.5,
+        "box_range_pts": 4.6,
+        "max_excursion_pts": 47.8,
+        "excursion_over_range": 10.39,
+        "excursion_over_atr": 12.04,
+        "atr_at_birth": 3.97
+      }
+    ]
+  },
+  "bias_accuracy": {
+    "total_stuck_bars_analyzed": 3979,
+    "position_above_box": {
+      "n_bars": 1706,
+      "n_forward_up": 879,
+      "n_forward_down": 821,
+      "n_forward_flat": 6,
+      "pct_up": 51.5,
+      "pct_down": 48.1,
+      "mean_4h_move_pts": 0.19,
+      "median_4h_move_pts": 0.75
+    },
+    "position_below_box": {
+      "n_bars": 1472,
+      "n_forward_up": 867,
+      "n_forward_down": 603,
+      "n_forward_flat": 2,
+      "pct_up": 58.9,
+      "pct_down": 41.0,
+      "mean_4h_move_pts": 3.0,
+      "median_4h_move_pts": 4.08
+    },
+    "position_inside": {
+      "n_bars": 801,
+      "n_forward_up": 442,
+      "n_forward_down": 358,
+      "n_forward_flat": 1,
+      "pct_up": 55.2,
+      "pct_down": 44.7,
+      "mean_4h_move_pts": 2.42,
+      "median_4h_move_pts": 2.0
+    }
+  },
+  "decision_log_xref": {
+    "decision_log_total_rows_in_window": 22302,
+    "rows_during_stuck_box_4h": 10036,
+    "rows_during_stuck_above_box": 1132,
+    "rows_during_stuck_below_box": 7876,
+    "block_rows_post_p0_total": 0,
+    "block_rows_post_p0_during_stuck": 0,
+    "note": "BLOCK rows only became visible after P0 deploy on 2026-04-28; post-P0 sample is small (hours not months). For full 10-month estimate, see Phase 2 backtest."
+  }
+}

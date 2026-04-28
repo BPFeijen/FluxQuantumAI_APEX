@@ -1,0 +1,2868 @@
+{
+  "params": {
+    "k_folds": 5,
+    "embargo_bars": 48,
+    "bootstrap_n": 1000,
+    "bonferroni_alpha": 0.00025,
+    "grid_K": [
+      2.0,
+      3.0,
+      4.0,
+      5.0
+    ],
+    "grid_T": [
+      2.0,
+      4.0,
+      6.0,
+      8.0
+    ],
+    "grid_lambda": [
+      0.05,
+      0.1,
+      0.2,
+      0.4
+    ],
+    "sl_pts": 20.0,
+    "tp_5x1": 100.0,
+    "tp_3x1": 60.0
+  },
+  "control_acc_4h": 0.5407142857142857,
+  "configs": [
+    {
+      "rule": "control",
+      "params": {},
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 4204,
+          "accuracy": 0.5323501427212178,
+          "coverage": 0.4667999111703309
+        },
+        "4h": {
+          "n": 4200,
+          "accuracy": 0.5407142857142857,
+          "coverage": 0.46635576282478347
+        },
+        "8h": {
+          "n": 4197,
+          "accuracy": 0.5439599714081487,
+          "coverage": 0.4660226515656229
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 0,
+        "total_pnl_5x1": 0.0,
+        "total_pnl_3x1": 0.0,
+        "mean_pnl_5x1": 0.0,
+        "win_rate_5x1": 0.0,
+        "monthly_pnl_5x1": 0.0,
+        "monthly_pnl_3x1": 0.0
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 457,
+          "accuracy": 0.499
+        },
+        "asian_med_vol": {
+          "n": 310,
+          "accuracy": 0.6
+        },
+        "asian_high_vol": {
+          "n": 390,
+          "accuracy": 0.579
+        },
+        "london_low_vol": {
+          "n": 352,
+          "accuracy": 0.446
+        },
+        "london_med_vol": {
+          "n": 356,
+          "accuracy": 0.508
+        },
+        "london_high_vol": {
+          "n": 265,
+          "accuracy": 0.642
+        },
+        "ny_low_vol": {
+          "n": 213,
+          "accuracy": 0.521
+        },
+        "ny_med_vol": {
+          "n": 311,
+          "accuracy": 0.563
+        },
+        "ny_high_vol": {
+          "n": 409,
+          "accuracy": 0.518
+        }
+      },
+      "M5_false_positive": {
+        "false_positive_pct": 0.0
+      },
+      "M6_cost": {
+        "per_tick_us": 0.0
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5401035679333066,
+        "wf_acc_std": 0.025135121252596284,
+        "wf_acc_ci_95": [
+          0.5192,
+          0.5594
+        ],
+        "wf_pnl_total_mean": 0.0,
+        "wf_pnl_ci_95": [
+          0.0,
+          0.0
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "A",
+      "params": {
+        "K": 2.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3211,
+          "accuracy": 0.5362815322329493,
+          "coverage": 0.35654008438818563
+        },
+        "4h": {
+          "n": 3207,
+          "accuracy": 0.5512940442781415,
+          "coverage": 0.35609593604263823
+        },
+        "8h": {
+          "n": 3204,
+          "accuracy": 0.5465043695380774,
+          "coverage": 0.3557628247834777
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 993,
+        "total_pnl_5x1": 2470.9,
+        "total_pnl_3x1": 1767.7,
+        "mean_pnl_5x1": 2.49,
+        "median_pnl_5x1": -0.3,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.492,
+        "monthly_pnl_5x1": 247.1,
+        "monthly_pnl_3x1": 176.8
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 398,
+          "accuracy": 0.497
+        },
+        "asian_med_vol": {
+          "n": 264,
+          "accuracy": 0.625
+        },
+        "asian_high_vol": {
+          "n": 299,
+          "accuracy": 0.629
+        },
+        "london_low_vol": {
+          "n": 255,
+          "accuracy": 0.478
+        },
+        "london_med_vol": {
+          "n": 320,
+          "accuracy": 0.522
+        },
+        "london_high_vol": {
+          "n": 185,
+          "accuracy": 0.605
+        },
+        "ny_low_vol": {
+          "n": 178,
+          "accuracy": 0.534
+        },
+        "ny_med_vol": {
+          "n": 216,
+          "accuracy": 0.537
+        },
+        "ny_high_vol": {
+          "n": 265,
+          "accuracy": 0.54
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 2367,
+        "n_boxes_expired": 277,
+        "n_false_positive": 18,
+        "false_positive_pct": 6.5
+      },
+      "M6_cost": {
+        "per_tick_us": 0.054
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5508255346362723,
+        "wf_acc_std": 0.02869830730119641,
+        "wf_acc_ci_95": [
+          0.527,
+          0.5759
+        ],
+        "wf_pnl_total_mean": 494.18,
+        "wf_pnl_ci_95": [
+          -227.0,
+          1215.3
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "A",
+      "params": {
+        "K": 3.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3663,
+          "accuracy": 0.5323505323505323,
+          "coverage": 0.4067288474350433
+        },
+        "4h": {
+          "n": 3659,
+          "accuracy": 0.5465974309920744,
+          "coverage": 0.4062846990894959
+        },
+        "8h": {
+          "n": 3656,
+          "accuracy": 0.550328227571116,
+          "coverage": 0.40595158783033536
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 541,
+        "total_pnl_5x1": 2542.8,
+        "total_pnl_3x1": 1849.8,
+        "mean_pnl_5x1": 4.7,
+        "median_pnl_5x1": -0.2,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.497,
+        "monthly_pnl_5x1": 254.3,
+        "monthly_pnl_3x1": 185.0
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 440,
+          "accuracy": 0.5
+        },
+        "asian_med_vol": {
+          "n": 286,
+          "accuracy": 0.615
+        },
+        "asian_high_vol": {
+          "n": 320,
+          "accuracy": 0.616
+        },
+        "london_low_vol": {
+          "n": 301,
+          "accuracy": 0.449
+        },
+        "london_med_vol": {
+          "n": 344,
+          "accuracy": 0.512
+        },
+        "london_high_vol": {
+          "n": 221,
+          "accuracy": 0.624
+        },
+        "ny_low_vol": {
+          "n": 189,
+          "accuracy": 0.534
+        },
+        "ny_med_vol": {
+          "n": 279,
+          "accuracy": 0.548
+        },
+        "ny_high_vol": {
+          "n": 303,
+          "accuracy": 0.551
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 1195,
+        "n_boxes_expired": 167,
+        "n_false_positive": 12,
+        "false_positive_pct": 7.19
+      },
+      "M6_cost": {
+        "per_tick_us": 0.05
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5458103541029912,
+        "wf_acc_std": 0.026390948591604558,
+        "wf_acc_ci_95": [
+          0.5235,
+          0.5681
+        ],
+        "wf_pnl_total_mean": 508.56000000000006,
+        "wf_pnl_ci_95": [
+          -71.2,
+          1088.3
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "A",
+      "params": {
+        "K": 4.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3938,
+          "accuracy": 0.5332656170644997,
+          "coverage": 0.43726404619142795
+        },
+        "4h": {
+          "n": 3934,
+          "accuracy": 0.543467208947636,
+          "coverage": 0.43681989784588054
+        },
+        "8h": {
+          "n": 3931,
+          "accuracy": 0.5451539048588145,
+          "coverage": 0.43648678658671997
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 266,
+        "total_pnl_5x1": 1405.6,
+        "total_pnl_3x1": 1031.5,
+        "mean_pnl_5x1": 5.28,
+        "median_pnl_5x1": -0.1,
+        "max_dd_5x1": 0.0,
+        "win_rate_5x1": 0.496,
+        "monthly_pnl_5x1": 140.6,
+        "monthly_pnl_3x1": 103.2
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 452,
+          "accuracy": 0.5
+        },
+        "asian_med_vol": {
+          "n": 297,
+          "accuracy": 0.613
+        },
+        "asian_high_vol": {
+          "n": 350,
+          "accuracy": 0.614
+        },
+        "london_low_vol": {
+          "n": 329,
+          "accuracy": 0.441
+        },
+        "london_med_vol": {
+          "n": 346,
+          "accuracy": 0.509
+        },
+        "london_high_vol": {
+          "n": 249,
+          "accuracy": 0.639
+        },
+        "ny_low_vol": {
+          "n": 197,
+          "accuracy": 0.538
+        },
+        "ny_med_vol": {
+          "n": 292,
+          "accuracy": 0.541
+        },
+        "ny_high_vol": {
+          "n": 360,
+          "accuracy": 0.517
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 574,
+        "n_boxes_expired": 89,
+        "n_false_positive": 7,
+        "false_positive_pct": 7.87
+      },
+      "M6_cost": {
+        "per_tick_us": 0.053
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5426097298995256,
+        "wf_acc_std": 0.02477623304437075,
+        "wf_acc_ci_95": [
+          0.5226,
+          0.5626
+        ],
+        "wf_pnl_total_mean": 281.12,
+        "wf_pnl_ci_95": [
+          -97.2,
+          716.2
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "A",
+      "params": {
+        "K": 5.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 4078,
+          "accuracy": 0.5338401177047573,
+          "coverage": 0.4528092382855874
+        },
+        "4h": {
+          "n": 4074,
+          "accuracy": 0.5419734904270986,
+          "coverage": 0.45236508994004
+        },
+        "8h": {
+          "n": 4071,
+          "accuracy": 0.5463031196266274,
+          "coverage": 0.4520319786808794
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 126,
+        "total_pnl_5x1": 957.1,
+        "total_pnl_3x1": 729.3,
+        "mean_pnl_5x1": 7.6,
+        "median_pnl_5x1": -0.2,
+        "max_dd_5x1": 0.0,
+        "win_rate_5x1": 0.5,
+        "monthly_pnl_5x1": 95.7,
+        "monthly_pnl_3x1": 72.9
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 453,
+          "accuracy": 0.501
+        },
+        "asian_med_vol": {
+          "n": 305,
+          "accuracy": 0.603
+        },
+        "asian_high_vol": {
+          "n": 379,
+          "accuracy": 0.594
+        },
+        "london_low_vol": {
+          "n": 340,
+          "accuracy": 0.447
+        },
+        "london_med_vol": {
+          "n": 349,
+          "accuracy": 0.504
+        },
+        "london_high_vol": {
+          "n": 251,
+          "accuracy": 0.641
+        },
+        "ny_low_vol": {
+          "n": 201,
+          "accuracy": 0.527
+        },
+        "ny_med_vol": {
+          "n": 300,
+          "accuracy": 0.55
+        },
+        "ny_high_vol": {
+          "n": 389,
+          "accuracy": 0.524
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 277,
+        "n_boxes_expired": 47,
+        "n_false_positive": 4,
+        "false_positive_pct": 8.51
+      },
+      "M6_cost": {
+        "per_tick_us": 0.052
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5411667513152147,
+        "wf_acc_std": 0.02580422343231858,
+        "wf_acc_ci_95": [
+          0.5201,
+          0.5614
+        ],
+        "wf_pnl_total_mean": 191.42000000000002,
+        "wf_pnl_ci_95": [
+          -25.0,
+          419.9
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "B",
+      "params": {
+        "T": 2.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 2318,
+          "accuracy": 0.5289042277825712,
+          "coverage": 0.25738396624472576
+        },
+        "4h": {
+          "n": 2314,
+          "accuracy": 0.5488331892826275,
+          "coverage": 0.2569398178991783
+        },
+        "8h": {
+          "n": 2311,
+          "accuracy": 0.542622241453916,
+          "coverage": 0.2566067066400178
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 1886,
+        "total_pnl_5x1": 2290.5,
+        "total_pnl_3x1": 1626.4,
+        "mean_pnl_5x1": 1.21,
+        "median_pnl_5x1": -1.0,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.467,
+        "monthly_pnl_5x1": 229.1,
+        "monthly_pnl_3x1": 162.6
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 262,
+          "accuracy": 0.5
+        },
+        "asian_med_vol": {
+          "n": 203,
+          "accuracy": 0.606
+        },
+        "asian_high_vol": {
+          "n": 235,
+          "accuracy": 0.587
+        },
+        "london_low_vol": {
+          "n": 167,
+          "accuracy": 0.455
+        },
+        "london_med_vol": {
+          "n": 206,
+          "accuracy": 0.519
+        },
+        "london_high_vol": {
+          "n": 138,
+          "accuracy": 0.667
+        },
+        "ny_low_vol": {
+          "n": 146,
+          "accuracy": 0.555
+        },
+        "ny_med_vol": {
+          "n": 153,
+          "accuracy": 0.516
+        },
+        "ny_high_vol": {
+          "n": 240,
+          "accuracy": 0.537
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 5953,
+        "n_boxes_expired": 530,
+        "n_false_positive": 105,
+        "false_positive_pct": 19.81
+      },
+      "M6_cost": {
+        "per_tick_us": 0.103
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5498999025232703,
+        "wf_acc_std": 0.03900069995721077,
+        "wf_acc_ci_95": [
+          0.513,
+          0.5801
+        ],
+        "wf_pnl_total_mean": 458.1,
+        "wf_pnl_ci_95": [
+          -472.0,
+          1721.9
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "B",
+      "params": {
+        "T": 4.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3103,
+          "accuracy": 0.5368997744118595,
+          "coverage": 0.3445480790584055
+        },
+        "4h": {
+          "n": 3099,
+          "accuracy": 0.5508228460793805,
+          "coverage": 0.3441039307128581
+        },
+        "8h": {
+          "n": 3096,
+          "accuracy": 0.5562015503875969,
+          "coverage": 0.34377081945369753
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 1101,
+        "total_pnl_5x1": 1678.0,
+        "total_pnl_3x1": 1275.5,
+        "mean_pnl_5x1": 1.52,
+        "median_pnl_5x1": -0.4,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.485,
+        "monthly_pnl_5x1": 167.8,
+        "monthly_pnl_3x1": 127.5
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 352,
+          "accuracy": 0.506
+        },
+        "asian_med_vol": {
+          "n": 269,
+          "accuracy": 0.61
+        },
+        "asian_high_vol": {
+          "n": 313,
+          "accuracy": 0.575
+        },
+        "london_low_vol": {
+          "n": 231,
+          "accuracy": 0.489
+        },
+        "london_med_vol": {
+          "n": 266,
+          "accuracy": 0.534
+        },
+        "london_high_vol": {
+          "n": 199,
+          "accuracy": 0.653
+        },
+        "ny_low_vol": {
+          "n": 180,
+          "accuracy": 0.544
+        },
+        "ny_med_vol": {
+          "n": 213,
+          "accuracy": 0.502
+        },
+        "ny_high_vol": {
+          "n": 295,
+          "accuracy": 0.536
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 4263,
+        "n_boxes_expired": 417,
+        "n_false_positive": 82,
+        "false_positive_pct": 19.66
+      },
+      "M6_cost": {
+        "per_tick_us": 0.125
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5511315343227193,
+        "wf_acc_std": 0.03841376568526361,
+        "wf_acc_ci_95": [
+          0.5184,
+          0.5818
+        ],
+        "wf_pnl_total_mean": 335.6,
+        "wf_pnl_ci_95": [
+          -402.7,
+          1169.3
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "B",
+      "params": {
+        "T": 6.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3562,
+          "accuracy": 0.5342504211117349,
+          "coverage": 0.39551410170997114
+        },
+        "4h": {
+          "n": 3558,
+          "accuracy": 0.5432827431141091,
+          "coverage": 0.39506995336442374
+        },
+        "8h": {
+          "n": 3555,
+          "accuracy": 0.5518987341772152,
+          "coverage": 0.39473684210526316
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 642,
+        "total_pnl_5x1": 863.1,
+        "total_pnl_3x1": 632.2,
+        "mean_pnl_5x1": 1.34,
+        "median_pnl_5x1": -0.8,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.472,
+        "monthly_pnl_5x1": 86.3,
+        "monthly_pnl_3x1": 63.2
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 396,
+          "accuracy": 0.492
+        },
+        "asian_med_vol": {
+          "n": 299,
+          "accuracy": 0.609
+        },
+        "asian_high_vol": {
+          "n": 333,
+          "accuracy": 0.574
+        },
+        "london_low_vol": {
+          "n": 262,
+          "accuracy": 0.473
+        },
+        "london_med_vol": {
+          "n": 319,
+          "accuracy": 0.514
+        },
+        "london_high_vol": {
+          "n": 236,
+          "accuracy": 0.653
+        },
+        "ny_low_vol": {
+          "n": 194,
+          "accuracy": 0.562
+        },
+        "ny_med_vol": {
+          "n": 253,
+          "accuracy": 0.534
+        },
+        "ny_high_vol": {
+          "n": 339,
+          "accuracy": 0.513
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 3009,
+        "n_boxes_expired": 300,
+        "n_false_positive": 59,
+        "false_positive_pct": 19.67
+      },
+      "M6_cost": {
+        "per_tick_us": 0.103
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5427228536869892,
+        "wf_acc_std": 0.0302111734821744,
+        "wf_acc_ci_95": [
+          0.5171,
+          0.5686
+        ],
+        "wf_pnl_total_mean": 172.62000000000003,
+        "wf_pnl_ci_95": [
+          -284.9,
+          660.6
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "B",
+      "params": {
+        "T": 8.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3801,
+          "accuracy": 0.5303867403314917,
+          "coverage": 0.422051965356429
+        },
+        "4h": {
+          "n": 3797,
+          "accuracy": 0.543323676586779,
+          "coverage": 0.4216078170108816
+        },
+        "8h": {
+          "n": 3794,
+          "accuracy": 0.5487612018977333,
+          "coverage": 0.4212747057517211
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 403,
+        "total_pnl_5x1": 780.3,
+        "total_pnl_3x1": 647.1,
+        "mean_pnl_5x1": 1.94,
+        "median_pnl_5x1": -0.3,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.481,
+        "monthly_pnl_5x1": 78.0,
+        "monthly_pnl_3x1": 64.7
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 415,
+          "accuracy": 0.504
+        },
+        "asian_med_vol": {
+          "n": 300,
+          "accuracy": 0.61
+        },
+        "asian_high_vol": {
+          "n": 334,
+          "accuracy": 0.572
+        },
+        "london_low_vol": {
+          "n": 288,
+          "accuracy": 0.476
+        },
+        "london_med_vol": {
+          "n": 334,
+          "accuracy": 0.506
+        },
+        "london_high_vol": {
+          "n": 249,
+          "accuracy": 0.659
+        },
+        "ny_low_vol": {
+          "n": 200,
+          "accuracy": 0.55
+        },
+        "ny_med_vol": {
+          "n": 278,
+          "accuracy": 0.54
+        },
+        "ny_high_vol": {
+          "n": 356,
+          "accuracy": 0.508
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 2192,
+        "n_boxes_expired": 218,
+        "n_false_positive": 48,
+        "false_positive_pct": 22.02
+      },
+      "M6_cost": {
+        "per_tick_us": 0.046
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5420990958404359,
+        "wf_acc_std": 0.028428472019566612,
+        "wf_acc_ci_95": [
+          0.518,
+          0.5668
+        ],
+        "wf_pnl_total_mean": 156.04000000000002,
+        "wf_pnl_ci_95": [
+          -173.6,
+          585.4
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 2.0,
+        "T": 2.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 2202,
+          "accuracy": 0.5317892824704814,
+          "coverage": 0.24450366422385075
+        },
+        "4h": {
+          "n": 2198,
+          "accuracy": 0.551410373066424,
+          "coverage": 0.24405951587830335
+        },
+        "8h": {
+          "n": 2195,
+          "accuracy": 0.5416856492027334,
+          "coverage": 0.2437264046191428
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 2002,
+        "total_pnl_5x1": 3018.7,
+        "total_pnl_3x1": 2124.7,
+        "mean_pnl_5x1": 1.51,
+        "median_pnl_5x1": -0.95,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.469,
+        "monthly_pnl_5x1": 301.9,
+        "monthly_pnl_3x1": 212.5
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 238,
+          "accuracy": 0.487
+        },
+        "asian_med_vol": {
+          "n": 190,
+          "accuracy": 0.621
+        },
+        "asian_high_vol": {
+          "n": 220,
+          "accuracy": 0.614
+        },
+        "london_low_vol": {
+          "n": 155,
+          "accuracy": 0.445
+        },
+        "london_med_vol": {
+          "n": 198,
+          "accuracy": 0.53
+        },
+        "london_high_vol": {
+          "n": 132,
+          "accuracy": 0.659
+        },
+        "ny_low_vol": {
+          "n": 145,
+          "accuracy": 0.559
+        },
+        "ny_med_vol": {
+          "n": 152,
+          "accuracy": 0.513
+        },
+        "ny_high_vol": {
+          "n": 222,
+          "accuracy": 0.545
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 6100,
+        "n_boxes_expired": 533,
+        "n_false_positive": 104,
+        "false_positive_pct": 19.51
+      },
+      "M6_cost": {
+        "per_tick_us": 0.264
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5527411289579446,
+        "wf_acc_std": 0.04241908323314838,
+        "wf_acc_ci_95": [
+          0.515,
+          0.5857
+        ],
+        "wf_pnl_total_mean": 603.74,
+        "wf_pnl_ci_95": [
+          -512.7,
+          1966.5
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 2.0,
+        "T": 4.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 2736,
+          "accuracy": 0.5369152046783626,
+          "coverage": 0.3037974683544304
+        },
+        "4h": {
+          "n": 2732,
+          "accuracy": 0.5541727672035139,
+          "coverage": 0.303353320008883
+        },
+        "8h": {
+          "n": 2729,
+          "accuracy": 0.5533162330524002,
+          "coverage": 0.3030202087497224
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 1468,
+        "total_pnl_5x1": 2734.7,
+        "total_pnl_3x1": 1960.1,
+        "mean_pnl_5x1": 1.86,
+        "median_pnl_5x1": -0.6,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.482,
+        "monthly_pnl_5x1": 273.5,
+        "monthly_pnl_3x1": 196.0
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 317,
+          "accuracy": 0.502
+        },
+        "asian_med_vol": {
+          "n": 239,
+          "accuracy": 0.611
+        },
+        "asian_high_vol": {
+          "n": 274,
+          "accuracy": 0.613
+        },
+        "london_low_vol": {
+          "n": 204,
+          "accuracy": 0.49
+        },
+        "london_med_vol": {
+          "n": 252,
+          "accuracy": 0.548
+        },
+        "london_high_vol": {
+          "n": 169,
+          "accuracy": 0.639
+        },
+        "ny_low_vol": {
+          "n": 163,
+          "accuracy": 0.552
+        },
+        "ny_med_vol": {
+          "n": 185,
+          "accuracy": 0.524
+        },
+        "ny_high_vol": {
+          "n": 250,
+          "accuracy": 0.532
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 4799,
+        "n_boxes_expired": 444,
+        "n_false_positive": 74,
+        "false_positive_pct": 16.67
+      },
+      "M6_cost": {
+        "per_tick_us": 0.085
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5550990417911859,
+        "wf_acc_std": 0.044682437782913725,
+        "wf_acc_ci_95": [
+          0.5178,
+          0.5923
+        ],
+        "wf_pnl_total_mean": 546.9399999999999,
+        "wf_pnl_ci_95": [
+          -531.7,
+          1625.6
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 2.0,
+        "T": 6.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 2972,
+          "accuracy": 0.5366756393001346,
+          "coverage": 0.33000222074172775
+        },
+        "4h": {
+          "n": 2968,
+          "accuracy": 0.5518867924528302,
+          "coverage": 0.32955807239618035
+        },
+        "8h": {
+          "n": 2965,
+          "accuracy": 0.5521079258010118,
+          "coverage": 0.32922496113701977
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 1232,
+        "total_pnl_5x1": 2613.1,
+        "total_pnl_3x1": 1890.1,
+        "mean_pnl_5x1": 2.12,
+        "median_pnl_5x1": -0.4,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.485,
+        "monthly_pnl_5x1": 261.3,
+        "monthly_pnl_3x1": 189.0
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 357,
+          "accuracy": 0.487
+        },
+        "asian_med_vol": {
+          "n": 261,
+          "accuracy": 0.625
+        },
+        "asian_high_vol": {
+          "n": 282,
+          "accuracy": 0.621
+        },
+        "london_low_vol": {
+          "n": 223,
+          "accuracy": 0.498
+        },
+        "london_med_vol": {
+          "n": 295,
+          "accuracy": 0.529
+        },
+        "london_high_vol": {
+          "n": 179,
+          "accuracy": 0.609
+        },
+        "ny_low_vol": {
+          "n": 168,
+          "accuracy": 0.565
+        },
+        "ny_med_vol": {
+          "n": 201,
+          "accuracy": 0.537
+        },
+        "ny_high_vol": {
+          "n": 259,
+          "accuracy": 0.533
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 3968,
+        "n_boxes_expired": 376,
+        "n_false_positive": 50,
+        "false_positive_pct": 13.3
+      },
+      "M6_cost": {
+        "per_tick_us": 0.091
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5521869505724278,
+        "wf_acc_std": 0.036074239675961475,
+        "wf_acc_ci_95": [
+          0.5216,
+          0.5828
+        ],
+        "wf_pnl_total_mean": 522.62,
+        "wf_pnl_ci_95": [
+          -371.6,
+          1416.8
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 2.0,
+        "T": 8.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3083,
+          "accuracy": 0.5342199156665586,
+          "coverage": 0.34232733733066845
+        },
+        "4h": {
+          "n": 3079,
+          "accuracy": 0.5524520948359857,
+          "coverage": 0.34188318898512104
+        },
+        "8h": {
+          "n": 3076,
+          "accuracy": 0.5487646293888166,
+          "coverage": 0.34155007772596047
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 1121,
+        "total_pnl_5x1": 2739.1,
+        "total_pnl_3x1": 2016.1,
+        "mean_pnl_5x1": 2.44,
+        "median_pnl_5x1": -0.3,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.49,
+        "monthly_pnl_5x1": 273.9,
+        "monthly_pnl_3x1": 201.6
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 374,
+          "accuracy": 0.497
+        },
+        "asian_med_vol": {
+          "n": 262,
+          "accuracy": 0.626
+        },
+        "asian_high_vol": {
+          "n": 282,
+          "accuracy": 0.621
+        },
+        "london_low_vol": {
+          "n": 235,
+          "accuracy": 0.494
+        },
+        "london_med_vol": {
+          "n": 308,
+          "accuracy": 0.523
+        },
+        "london_high_vol": {
+          "n": 179,
+          "accuracy": 0.609
+        },
+        "ny_low_vol": {
+          "n": 172,
+          "accuracy": 0.552
+        },
+        "ny_med_vol": {
+          "n": 210,
+          "accuracy": 0.543
+        },
+        "ny_high_vol": {
+          "n": 263,
+          "accuracy": 0.536
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 3483,
+        "n_boxes_expired": 336,
+        "n_false_positive": 39,
+        "false_positive_pct": 11.61
+      },
+      "M6_cost": {
+        "per_tick_us": 0.086
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5521500619328512,
+        "wf_acc_std": 0.03198118534448087,
+        "wf_acc_ci_95": [
+          0.5251,
+          0.5793
+        ],
+        "wf_pnl_total_mean": 547.8199999999999,
+        "wf_pnl_ci_95": [
+          -231.6,
+          1329.9
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 3.0,
+        "T": 2.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 2269,
+          "accuracy": 0.5310709563684443,
+          "coverage": 0.25194314901176995
+        },
+        "4h": {
+          "n": 2265,
+          "accuracy": 0.5518763796909493,
+          "coverage": 0.2514990006662225
+        },
+        "8h": {
+          "n": 2262,
+          "accuracy": 0.5446507515473032,
+          "coverage": 0.25116588940706197
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 1935,
+        "total_pnl_5x1": 3073.9,
+        "total_pnl_3x1": 2190.1,
+        "mean_pnl_5x1": 1.59,
+        "median_pnl_5x1": -0.9,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.47,
+        "monthly_pnl_5x1": 307.4,
+        "monthly_pnl_3x1": 219.0
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 255,
+          "accuracy": 0.498
+        },
+        "asian_med_vol": {
+          "n": 199,
+          "accuracy": 0.618
+        },
+        "asian_high_vol": {
+          "n": 224,
+          "accuracy": 0.603
+        },
+        "london_low_vol": {
+          "n": 158,
+          "accuracy": 0.449
+        },
+        "london_med_vol": {
+          "n": 205,
+          "accuracy": 0.517
+        },
+        "london_high_vol": {
+          "n": 137,
+          "accuracy": 0.672
+        },
+        "ny_low_vol": {
+          "n": 145,
+          "accuracy": 0.559
+        },
+        "ny_med_vol": {
+          "n": 153,
+          "accuracy": 0.516
+        },
+        "ny_high_vol": {
+          "n": 233,
+          "accuracy": 0.549
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 6009,
+        "n_boxes_expired": 530,
+        "n_false_positive": 105,
+        "false_positive_pct": 19.81
+      },
+      "M6_cost": {
+        "per_tick_us": 0.085
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5531908118544481,
+        "wf_acc_std": 0.039546418814232605,
+        "wf_acc_ci_95": [
+          0.5169,
+          0.5832
+        ],
+        "wf_pnl_total_mean": 614.8,
+        "wf_pnl_ci_95": [
+          -463.3,
+          1946.2
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 3.0,
+        "T": 4.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 2950,
+          "accuracy": 0.5349152542372881,
+          "coverage": 0.327559404841217
+        },
+        "4h": {
+          "n": 2946,
+          "accuracy": 0.551255940257977,
+          "coverage": 0.3271152564956695
+        },
+        "8h": {
+          "n": 2943,
+          "accuracy": 0.5562351342167856,
+          "coverage": 0.326782145236509
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 1254,
+        "total_pnl_5x1": 2735.3,
+        "total_pnl_3x1": 1970.9,
+        "mean_pnl_5x1": 2.18,
+        "median_pnl_5x1": -0.55,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.482,
+        "monthly_pnl_5x1": 273.5,
+        "monthly_pnl_3x1": 197.1
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 344,
+          "accuracy": 0.503
+        },
+        "asian_med_vol": {
+          "n": 256,
+          "accuracy": 0.609
+        },
+        "asian_high_vol": {
+          "n": 285,
+          "accuracy": 0.596
+        },
+        "london_low_vol": {
+          "n": 217,
+          "accuracy": 0.479
+        },
+        "london_med_vol": {
+          "n": 261,
+          "accuracy": 0.536
+        },
+        "london_high_vol": {
+          "n": 185,
+          "accuracy": 0.643
+        },
+        "ny_low_vol": {
+          "n": 171,
+          "accuracy": 0.55
+        },
+        "ny_med_vol": {
+          "n": 205,
+          "accuracy": 0.507
+        },
+        "ny_high_vol": {
+          "n": 272,
+          "accuracy": 0.548
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 4466,
+        "n_boxes_expired": 426,
+        "n_false_positive": 80,
+        "false_positive_pct": 18.78
+      },
+      "M6_cost": {
+        "per_tick_us": 0.716
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5519509037857765,
+        "wf_acc_std": 0.03973640594687592,
+        "wf_acc_ci_95": [
+          0.5173,
+          0.5836
+        ],
+        "wf_pnl_total_mean": 547.0600000000001,
+        "wf_pnl_ci_95": [
+          -426.1,
+          1541.3
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 3.0,
+        "T": 6.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3283,
+          "accuracy": 0.5327444410600061,
+          "coverage": 0.3645347546080391
+        },
+        "4h": {
+          "n": 3279,
+          "accuracy": 0.546203110704483,
+          "coverage": 0.3640906062624917
+        },
+        "8h": {
+          "n": 3276,
+          "accuracy": 0.5546398046398047,
+          "coverage": 0.3637574950033311
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 921,
+        "total_pnl_5x1": 2391.2,
+        "total_pnl_3x1": 1678.4,
+        "mean_pnl_5x1": 2.6,
+        "median_pnl_5x1": -0.8,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.477,
+        "monthly_pnl_5x1": 239.1,
+        "monthly_pnl_3x1": 167.8
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 386,
+          "accuracy": 0.49
+        },
+        "asian_med_vol": {
+          "n": 283,
+          "accuracy": 0.615
+        },
+        "asian_high_vol": {
+          "n": 297,
+          "accuracy": 0.603
+        },
+        "london_low_vol": {
+          "n": 248,
+          "accuracy": 0.464
+        },
+        "london_med_vol": {
+          "n": 312,
+          "accuracy": 0.519
+        },
+        "london_high_vol": {
+          "n": 203,
+          "accuracy": 0.631
+        },
+        "ny_low_vol": {
+          "n": 177,
+          "accuracy": 0.565
+        },
+        "ny_med_vol": {
+          "n": 237,
+          "accuracy": 0.536
+        },
+        "ny_high_vol": {
+          "n": 292,
+          "accuracy": 0.538
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 3412,
+        "n_boxes_expired": 337,
+        "n_false_positive": 56,
+        "false_positive_pct": 16.62
+      },
+      "M6_cost": {
+        "per_tick_us": 0.159
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5459765951403689,
+        "wf_acc_std": 0.033294125794092834,
+        "wf_acc_ci_95": [
+          0.518,
+          0.5748
+        ],
+        "wf_pnl_total_mean": 478.23999999999995,
+        "wf_pnl_ci_95": [
+          -287.4,
+          1266.7
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 3.0,
+        "T": 8.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3452,
+          "accuracy": 0.52954808806489,
+          "coverage": 0.38330002220741727
+        },
+        "4h": {
+          "n": 3448,
+          "accuracy": 0.5458236658932715,
+          "coverage": 0.38285587386186987
+        },
+        "8h": {
+          "n": 3445,
+          "accuracy": 0.5526850507982584,
+          "coverage": 0.3825227626027093
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 752,
+        "total_pnl_5x1": 2675.2,
+        "total_pnl_3x1": 1962.4,
+        "mean_pnl_5x1": 3.56,
+        "median_pnl_5x1": -0.55,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.48,
+        "monthly_pnl_5x1": 267.5,
+        "monthly_pnl_3x1": 196.2
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 403,
+          "accuracy": 0.499
+        },
+        "asian_med_vol": {
+          "n": 284,
+          "accuracy": 0.616
+        },
+        "asian_high_vol": {
+          "n": 297,
+          "accuracy": 0.603
+        },
+        "london_low_vol": {
+          "n": 271,
+          "accuracy": 0.461
+        },
+        "london_med_vol": {
+          "n": 327,
+          "accuracy": 0.511
+        },
+        "london_high_vol": {
+          "n": 208,
+          "accuracy": 0.639
+        },
+        "ny_low_vol": {
+          "n": 182,
+          "accuracy": 0.549
+        },
+        "ny_med_vol": {
+          "n": 260,
+          "accuracy": 0.542
+        },
+        "ny_high_vol": {
+          "n": 300,
+          "accuracy": 0.547
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 2742,
+        "n_boxes_expired": 274,
+        "n_false_positive": 45,
+        "false_positive_pct": 16.42
+      },
+      "M6_cost": {
+        "per_tick_us": 0.071
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5450767257025456,
+        "wf_acc_std": 0.02974061868562481,
+        "wf_acc_ci_95": [
+          0.5204,
+          0.571
+        ],
+        "wf_pnl_total_mean": 535.02,
+        "wf_pnl_ci_95": [
+          -120.3,
+          1190.4
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 4.0,
+        "T": 2.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 2291,
+          "accuracy": 0.5298996071584461,
+          "coverage": 0.2543859649122807
+        },
+        "4h": {
+          "n": 2287,
+          "accuracy": 0.5509400961958898,
+          "coverage": 0.2539418165667333
+        },
+        "8h": {
+          "n": 2284,
+          "accuracy": 0.5442206654991243,
+          "coverage": 0.25360870530757273
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 1913,
+        "total_pnl_5x1": 2967.6,
+        "total_pnl_3x1": 2109.1,
+        "mean_pnl_5x1": 1.55,
+        "median_pnl_5x1": -0.9,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.469,
+        "monthly_pnl_5x1": 296.8,
+        "monthly_pnl_3x1": 210.9
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 262,
+          "accuracy": 0.5
+        },
+        "asian_med_vol": {
+          "n": 202,
+          "accuracy": 0.609
+        },
+        "asian_high_vol": {
+          "n": 226,
+          "accuracy": 0.602
+        },
+        "london_low_vol": {
+          "n": 163,
+          "accuracy": 0.448
+        },
+        "london_med_vol": {
+          "n": 205,
+          "accuracy": 0.517
+        },
+        "london_high_vol": {
+          "n": 137,
+          "accuracy": 0.672
+        },
+        "ny_low_vol": {
+          "n": 145,
+          "accuracy": 0.559
+        },
+        "ny_med_vol": {
+          "n": 153,
+          "accuracy": 0.516
+        },
+        "ny_high_vol": {
+          "n": 236,
+          "accuracy": 0.547
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 5982,
+        "n_boxes_expired": 530,
+        "n_false_positive": 105,
+        "false_positive_pct": 19.81
+      },
+      "M6_cost": {
+        "per_tick_us": 0.309
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5521719639698315,
+        "wf_acc_std": 0.04017220348275038,
+        "wf_acc_ci_95": [
+          0.5159,
+          0.5833
+        ],
+        "wf_pnl_total_mean": 593.54,
+        "wf_pnl_ci_95": [
+          -475.4,
+          1887.0
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 4.0,
+        "T": 4.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3033,
+          "accuracy": 0.5361028684470821,
+          "coverage": 0.33677548301132576
+        },
+        "4h": {
+          "n": 3029,
+          "accuracy": 0.5519973588643117,
+          "coverage": 0.33633133466577836
+        },
+        "8h": {
+          "n": 3026,
+          "accuracy": 0.5565102445472571,
+          "coverage": 0.33599822340661784
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 1171,
+        "total_pnl_5x1": 2637.9,
+        "total_pnl_3x1": 1961.0,
+        "mean_pnl_5x1": 2.25,
+        "median_pnl_5x1": -0.4,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.486,
+        "monthly_pnl_5x1": 263.8,
+        "monthly_pnl_3x1": 196.1
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 352,
+          "accuracy": 0.506
+        },
+        "asian_med_vol": {
+          "n": 264,
+          "accuracy": 0.606
+        },
+        "asian_high_vol": {
+          "n": 296,
+          "accuracy": 0.595
+        },
+        "london_low_vol": {
+          "n": 227,
+          "accuracy": 0.485
+        },
+        "london_med_vol": {
+          "n": 262,
+          "accuracy": 0.534
+        },
+        "london_high_vol": {
+          "n": 193,
+          "accuracy": 0.653
+        },
+        "ny_low_vol": {
+          "n": 173,
+          "accuracy": 0.543
+        },
+        "ny_med_vol": {
+          "n": 209,
+          "accuracy": 0.498
+        },
+        "ny_high_vol": {
+          "n": 286,
+          "accuracy": 0.545
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 4345,
+        "n_boxes_expired": 421,
+        "n_false_positive": 82,
+        "false_positive_pct": 19.48
+      },
+      "M6_cost": {
+        "per_tick_us": 0.144
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5524905416168194,
+        "wf_acc_std": 0.03871965318278002,
+        "wf_acc_ci_95": [
+          0.5211,
+          0.5839
+        ],
+        "wf_pnl_total_mean": 527.5799999999999,
+        "wf_pnl_ci_95": [
+          -361.8,
+          1416.9
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 4.0,
+        "T": 6.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3445,
+          "accuracy": 0.5335268505079825,
+          "coverage": 0.3825227626027093
+        },
+        "4h": {
+          "n": 3441,
+          "accuracy": 0.5451903516419645,
+          "coverage": 0.3820786142571619
+        },
+        "8h": {
+          "n": 3438,
+          "accuracy": 0.5523560209424084,
+          "coverage": 0.3817455029980013
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 759,
+        "total_pnl_5x1": 2006.5,
+        "total_pnl_3x1": 1421.2,
+        "mean_pnl_5x1": 2.64,
+        "median_pnl_5x1": -0.6,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.477,
+        "monthly_pnl_5x1": 200.7,
+        "monthly_pnl_3x1": 142.1
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 395,
+          "accuracy": 0.494
+        },
+        "asian_med_vol": {
+          "n": 292,
+          "accuracy": 0.61
+        },
+        "asian_high_vol": {
+          "n": 313,
+          "accuracy": 0.597
+        },
+        "london_low_vol": {
+          "n": 258,
+          "accuracy": 0.469
+        },
+        "london_med_vol": {
+          "n": 313,
+          "accuracy": 0.518
+        },
+        "london_high_vol": {
+          "n": 224,
+          "accuracy": 0.643
+        },
+        "ny_low_vol": {
+          "n": 184,
+          "accuracy": 0.565
+        },
+        "ny_med_vol": {
+          "n": 246,
+          "accuracy": 0.528
+        },
+        "ny_high_vol": {
+          "n": 320,
+          "accuracy": 0.522
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 3159,
+        "n_boxes_expired": 316,
+        "n_false_positive": 59,
+        "false_positive_pct": 18.67
+      },
+      "M6_cost": {
+        "per_tick_us": 0.264
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5446659184072897,
+        "wf_acc_std": 0.033896317439228794,
+        "wf_acc_ci_95": [
+          0.5167,
+          0.5757
+        ],
+        "wf_pnl_total_mean": 401.3,
+        "wf_pnl_ci_95": [
+          -226.5,
+          1150.1
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 4.0,
+        "T": 8.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3649,
+          "accuracy": 0.5294601260619348,
+          "coverage": 0.4051743282256274
+        },
+        "4h": {
+          "n": 3645,
+          "accuracy": 0.5440329218106996,
+          "coverage": 0.4047301798800799
+        },
+        "8h": {
+          "n": 3642,
+          "accuracy": 0.5485996705107083,
+          "coverage": 0.4043970686209194
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 555,
+        "total_pnl_5x1": 1780.6,
+        "total_pnl_3x1": 1293.0,
+        "mean_pnl_5x1": 3.21,
+        "median_pnl_5x1": -0.5,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.477,
+        "monthly_pnl_5x1": 178.1,
+        "monthly_pnl_3x1": 129.3
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 412,
+          "accuracy": 0.502
+        },
+        "asian_med_vol": {
+          "n": 293,
+          "accuracy": 0.611
+        },
+        "asian_high_vol": {
+          "n": 314,
+          "accuracy": 0.596
+        },
+        "london_low_vol": {
+          "n": 281,
+          "accuracy": 0.466
+        },
+        "london_med_vol": {
+          "n": 328,
+          "accuracy": 0.509
+        },
+        "london_high_vol": {
+          "n": 233,
+          "accuracy": 0.657
+        },
+        "ny_low_vol": {
+          "n": 190,
+          "accuracy": 0.553
+        },
+        "ny_med_vol": {
+          "n": 271,
+          "accuracy": 0.535
+        },
+        "ny_high_vol": {
+          "n": 336,
+          "accuracy": 0.518
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 2406,
+        "n_boxes_expired": 242,
+        "n_false_positive": 48,
+        "false_positive_pct": 19.83
+      },
+      "M6_cost": {
+        "per_tick_us": 0.074
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5429607160794953,
+        "wf_acc_std": 0.03047799740218424,
+        "wf_acc_ci_95": [
+          0.518,
+          0.5698
+        ],
+        "wf_pnl_total_mean": 356.12,
+        "wf_pnl_ci_95": [
+          -113.1,
+          825.3
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 5.0,
+        "T": 2.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 2307,
+          "accuracy": 0.5288253142609449,
+          "coverage": 0.2561625582944704
+        },
+        "4h": {
+          "n": 2303,
+          "accuracy": 0.5497177594442032,
+          "coverage": 0.2557184099489229
+        },
+        "8h": {
+          "n": 2300,
+          "accuracy": 0.5434782608695652,
+          "coverage": 0.2553852986897624
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 1897,
+        "total_pnl_5x1": 2726.1,
+        "total_pnl_3x1": 1921.0,
+        "mean_pnl_5x1": 1.44,
+        "median_pnl_5x1": -1.0,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.468,
+        "monthly_pnl_5x1": 272.6,
+        "monthly_pnl_3x1": 192.1
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 262,
+          "accuracy": 0.5
+        },
+        "asian_med_vol": {
+          "n": 203,
+          "accuracy": 0.606
+        },
+        "asian_high_vol": {
+          "n": 233,
+          "accuracy": 0.592
+        },
+        "london_low_vol": {
+          "n": 165,
+          "accuracy": 0.448
+        },
+        "london_med_vol": {
+          "n": 205,
+          "accuracy": 0.517
+        },
+        "london_high_vol": {
+          "n": 137,
+          "accuracy": 0.672
+        },
+        "ny_low_vol": {
+          "n": 146,
+          "accuracy": 0.555
+        },
+        "ny_med_vol": {
+          "n": 153,
+          "accuracy": 0.516
+        },
+        "ny_high_vol": {
+          "n": 236,
+          "accuracy": 0.547
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 5964,
+        "n_boxes_expired": 530,
+        "n_false_positive": 105,
+        "false_positive_pct": 19.81
+      },
+      "M6_cost": {
+        "per_tick_us": 0.071
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.550809051832262,
+        "wf_acc_std": 0.03975948239281698,
+        "wf_acc_ci_95": [
+          0.5148,
+          0.582
+        ],
+        "wf_pnl_total_mean": 545.22,
+        "wf_pnl_ci_95": [
+          -471.3,
+          1807.3
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 5.0,
+        "T": 4.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3072,
+          "accuracy": 0.5354817708333334,
+          "coverage": 0.34110592938041306
+        },
+        "4h": {
+          "n": 3068,
+          "accuracy": 0.5501955671447197,
+          "coverage": 0.34066178103486566
+        },
+        "8h": {
+          "n": 3065,
+          "accuracy": 0.5562805872756933,
+          "coverage": 0.3403286697757051
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 1132,
+        "total_pnl_5x1": 2257.1,
+        "total_pnl_3x1": 1633.6,
+        "mean_pnl_5x1": 1.99,
+        "median_pnl_5x1": -0.55,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.482,
+        "monthly_pnl_5x1": 225.7,
+        "monthly_pnl_3x1": 163.4
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 352,
+          "accuracy": 0.506
+        },
+        "asian_med_vol": {
+          "n": 267,
+          "accuracy": 0.607
+        },
+        "asian_high_vol": {
+          "n": 309,
+          "accuracy": 0.583
+        },
+        "london_low_vol": {
+          "n": 229,
+          "accuracy": 0.485
+        },
+        "london_med_vol": {
+          "n": 263,
+          "accuracy": 0.532
+        },
+        "london_high_vol": {
+          "n": 193,
+          "accuracy": 0.653
+        },
+        "ny_low_vol": {
+          "n": 176,
+          "accuracy": 0.534
+        },
+        "ny_med_vol": {
+          "n": 211,
+          "accuracy": 0.498
+        },
+        "ny_high_vol": {
+          "n": 290,
+          "accuracy": 0.545
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 4299,
+        "n_boxes_expired": 418,
+        "n_false_positive": 82,
+        "false_positive_pct": 19.62
+      },
+      "M6_cost": {
+        "per_tick_us": 0.083
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5505874911656328,
+        "wf_acc_std": 0.03894394101965363,
+        "wf_acc_ci_95": [
+          0.5186,
+          0.5826
+        ],
+        "wf_pnl_total_mean": 451.41999999999996,
+        "wf_pnl_ci_95": [
+          -371.3,
+          1274.1
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 5.0,
+        "T": 6.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3507,
+          "accuracy": 0.5332192757342458,
+          "coverage": 0.3894070619586942
+        },
+        "4h": {
+          "n": 3503,
+          "accuracy": 0.5423922352269483,
+          "coverage": 0.3889629136131468
+        },
+        "8h": {
+          "n": 3500,
+          "accuracy": 0.552,
+          "coverage": 0.38862980235398625
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 697,
+        "total_pnl_5x1": 1329.0,
+        "total_pnl_3x1": 877.1,
+        "mean_pnl_5x1": 1.91,
+        "median_pnl_5x1": -1.1,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.466,
+        "monthly_pnl_5x1": 132.9,
+        "monthly_pnl_3x1": 87.7
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 395,
+          "accuracy": 0.494
+        },
+        "asian_med_vol": {
+          "n": 296,
+          "accuracy": 0.608
+        },
+        "asian_high_vol": {
+          "n": 329,
+          "accuracy": 0.581
+        },
+        "london_low_vol": {
+          "n": 260,
+          "accuracy": 0.469
+        },
+        "london_med_vol": {
+          "n": 316,
+          "accuracy": 0.513
+        },
+        "london_high_vol": {
+          "n": 226,
+          "accuracy": 0.646
+        },
+        "ny_low_vol": {
+          "n": 188,
+          "accuracy": 0.553
+        },
+        "ny_med_vol": {
+          "n": 248,
+          "accuracy": 0.528
+        },
+        "ny_high_vol": {
+          "n": 330,
+          "accuracy": 0.524
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 3079,
+        "n_boxes_expired": 307,
+        "n_false_positive": 59,
+        "false_positive_pct": 19.22
+      },
+      "M6_cost": {
+        "per_tick_us": 0.101
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5419077835779313,
+        "wf_acc_std": 0.032537432977102765,
+        "wf_acc_ci_95": [
+          0.5148,
+          0.57
+        ],
+        "wf_pnl_total_mean": 265.80000000000007,
+        "wf_pnl_ci_95": [
+          -244.2,
+          834.2
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "C",
+      "params": {
+        "K": 5.0,
+        "T": 8.0
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3732,
+          "accuracy": 0.5297427652733119,
+          "coverage": 0.41439040639573615
+        },
+        "4h": {
+          "n": 3728,
+          "accuracy": 0.5426502145922747,
+          "coverage": 0.41394625805018875
+        },
+        "8h": {
+          "n": 3725,
+          "accuracy": 0.5484563758389261,
+          "coverage": 0.41361314679102823
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 472,
+        "total_pnl_5x1": 1237.5,
+        "total_pnl_3x1": 883.3,
+        "mean_pnl_5x1": 2.62,
+        "median_pnl_5x1": -0.6,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.472,
+        "monthly_pnl_5x1": 123.8,
+        "monthly_pnl_3x1": 88.3
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 413,
+          "accuracy": 0.504
+        },
+        "asian_med_vol": {
+          "n": 297,
+          "accuracy": 0.609
+        },
+        "asian_high_vol": {
+          "n": 330,
+          "accuracy": 0.579
+        },
+        "london_low_vol": {
+          "n": 286,
+          "accuracy": 0.472
+        },
+        "london_med_vol": {
+          "n": 331,
+          "accuracy": 0.505
+        },
+        "london_high_vol": {
+          "n": 235,
+          "accuracy": 0.66
+        },
+        "ny_low_vol": {
+          "n": 194,
+          "accuracy": 0.541
+        },
+        "ny_med_vol": {
+          "n": 273,
+          "accuracy": 0.535
+        },
+        "ny_high_vol": {
+          "n": 347,
+          "accuracy": 0.519
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 2286,
+        "n_boxes_expired": 228,
+        "n_false_positive": 48,
+        "false_positive_pct": 21.05
+      },
+      "M6_cost": {
+        "per_tick_us": 0.179
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5415023907497736,
+        "wf_acc_std": 0.030023913988101874,
+        "wf_acc_ci_95": [
+          0.5162,
+          0.5677
+        ],
+        "wf_pnl_total_mean": 247.5,
+        "wf_pnl_ci_95": [
+          -96.2,
+          591.5
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "D",
+      "params": {
+        "lambda": 0.05
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3998,
+          "accuracy": 0.531015507753877,
+          "coverage": 0.44392627137463914
+        },
+        "4h": {
+          "n": 3994,
+          "accuracy": 0.5410615923885829,
+          "coverage": 0.44348212302909173
+        },
+        "8h": {
+          "n": 3991,
+          "accuracy": 0.5424705587572037,
+          "coverage": 0.44314901176993116
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 206,
+        "total_pnl_5x1": 286.4,
+        "total_pnl_3x1": 186.7,
+        "mean_pnl_5x1": 1.39,
+        "median_pnl_5x1": -0.85,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.466,
+        "monthly_pnl_5x1": 28.6,
+        "monthly_pnl_3x1": 18.7
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 420,
+          "accuracy": 0.51
+        },
+        "asian_med_vol": {
+          "n": 302,
+          "accuracy": 0.613
+        },
+        "asian_high_vol": {
+          "n": 335,
+          "accuracy": 0.57
+        },
+        "london_low_vol": {
+          "n": 351,
+          "accuracy": 0.444
+        },
+        "london_med_vol": {
+          "n": 350,
+          "accuracy": 0.509
+        },
+        "london_high_vol": {
+          "n": 262,
+          "accuracy": 0.645
+        },
+        "ny_low_vol": {
+          "n": 205,
+          "accuracy": 0.541
+        },
+        "ny_med_vol": {
+          "n": 296,
+          "accuracy": 0.541
+        },
+        "ny_high_vol": {
+          "n": 391,
+          "accuracy": 0.522
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 1089,
+        "n_boxes_expired": 105,
+        "n_false_positive": 31,
+        "false_positive_pct": 29.52
+      },
+      "M6_cost": {
+        "per_tick_us": 0.062
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5401566730856697,
+        "wf_acc_std": 0.022979654159668135,
+        "wf_acc_ci_95": [
+          0.5211,
+          0.5592
+        ],
+        "wf_pnl_total_mean": 57.25999999999999,
+        "wf_pnl_ci_95": [
+          -249.1,
+          393.9
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "D",
+      "params": {
+        "lambda": 0.1
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 3636,
+          "accuracy": 0.5327282728272827,
+          "coverage": 0.4037308461025983
+        },
+        "4h": {
+          "n": 3632,
+          "accuracy": 0.5432268722466961,
+          "coverage": 0.40328669775705084
+        },
+        "8h": {
+          "n": 3629,
+          "accuracy": 0.550564893910168,
+          "coverage": 0.4029535864978903
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 568,
+        "total_pnl_5x1": 762.5,
+        "total_pnl_3x1": 580.9,
+        "mean_pnl_5x1": 1.34,
+        "median_pnl_5x1": -0.75,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.474,
+        "monthly_pnl_5x1": 76.2,
+        "monthly_pnl_3x1": 58.1
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 404,
+          "accuracy": 0.498
+        },
+        "asian_med_vol": {
+          "n": 299,
+          "accuracy": 0.609
+        },
+        "asian_high_vol": {
+          "n": 334,
+          "accuracy": 0.572
+        },
+        "london_low_vol": {
+          "n": 267,
+          "accuracy": 0.472
+        },
+        "london_med_vol": {
+          "n": 324,
+          "accuracy": 0.512
+        },
+        "london_high_vol": {
+          "n": 240,
+          "accuracy": 0.658
+        },
+        "ny_low_vol": {
+          "n": 196,
+          "accuracy": 0.561
+        },
+        "ny_med_vol": {
+          "n": 261,
+          "accuracy": 0.536
+        },
+        "ny_high_vol": {
+          "n": 345,
+          "accuracy": 0.51
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 2771,
+        "n_boxes_expired": 277,
+        "n_false_positive": 59,
+        "false_positive_pct": 21.3
+      },
+      "M6_cost": {
+        "per_tick_us": 0.067
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5424003124838215,
+        "wf_acc_std": 0.03012351368016599,
+        "wf_acc_ci_95": [
+          0.5172,
+          0.5688
+        ],
+        "wf_pnl_total_mean": 152.48,
+        "wf_pnl_ci_95": [
+          -267.2,
+          614.5
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "D",
+      "params": {
+        "lambda": 0.2
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 2773,
+          "accuracy": 0.5301117922827263,
+          "coverage": 0.30790584055074394
+        },
+        "4h": {
+          "n": 2769,
+          "accuracy": 0.5467677862044059,
+          "coverage": 0.30746169220519654
+        },
+        "8h": {
+          "n": 2766,
+          "accuracy": 0.5498915401301518,
+          "coverage": 0.30712858094603596
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 1431,
+        "total_pnl_5x1": 1409.9,
+        "total_pnl_3x1": 963.0,
+        "mean_pnl_5x1": 0.99,
+        "median_pnl_5x1": -0.9,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.468,
+        "monthly_pnl_5x1": 141.0,
+        "monthly_pnl_3x1": 96.3
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 315,
+          "accuracy": 0.498
+        },
+        "asian_med_vol": {
+          "n": 246,
+          "accuracy": 0.61
+        },
+        "asian_high_vol": {
+          "n": 289,
+          "accuracy": 0.571
+        },
+        "london_low_vol": {
+          "n": 202,
+          "accuracy": 0.465
+        },
+        "london_med_vol": {
+          "n": 240,
+          "accuracy": 0.512
+        },
+        "london_high_vol": {
+          "n": 174,
+          "accuracy": 0.667
+        },
+        "ny_low_vol": {
+          "n": 168,
+          "accuracy": 0.548
+        },
+        "ny_med_vol": {
+          "n": 184,
+          "accuracy": 0.511
+        },
+        "ny_high_vol": {
+          "n": 267,
+          "accuracy": 0.539
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 5041,
+        "n_boxes_expired": 473,
+        "n_false_positive": 96,
+        "false_positive_pct": 20.3
+      },
+      "M6_cost": {
+        "per_tick_us": 0.064
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5475168468569925,
+        "wf_acc_std": 0.03781947703272773,
+        "wf_acc_ci_95": [
+          0.5131,
+          0.5776
+        ],
+        "wf_pnl_total_mean": 281.97999999999996,
+        "wf_pnl_ci_95": [
+          -566.5,
+          1293.9
+        ],
+        "n_folds": 5
+      }
+    },
+    {
+      "rule": "D",
+      "params": {
+        "lambda": 0.4
+      },
+      "M1_bias_accuracy": {
+        "1h": {
+          "n": 2016,
+          "accuracy": 0.5168650793650794,
+          "coverage": 0.22385076615589608
+        },
+        "4h": {
+          "n": 2012,
+          "accuracy": 0.5501988071570576,
+          "coverage": 0.22340661781034865
+        },
+        "8h": {
+          "n": 2009,
+          "accuracy": 0.5395719263315082,
+          "coverage": 0.2230735065511881
+        }
+      },
+      "M2_conversion_pnl": {
+        "n_converted": 2188,
+        "total_pnl_5x1": 2951.6,
+        "total_pnl_3x1": 2048.8,
+        "mean_pnl_5x1": 1.35,
+        "median_pnl_5x1": -1.1,
+        "max_dd_5x1": 53.3,
+        "win_rate_5x1": 0.465,
+        "monthly_pnl_5x1": 295.2,
+        "monthly_pnl_3x1": 204.9
+      },
+      "M4_subgroup": {
+        "asian_low_vol": {
+          "n": 218,
+          "accuracy": 0.5
+        },
+        "asian_med_vol": {
+          "n": 172,
+          "accuracy": 0.616
+        },
+        "asian_high_vol": {
+          "n": 203,
+          "accuracy": 0.616
+        },
+        "london_low_vol": {
+          "n": 148,
+          "accuracy": 0.459
+        },
+        "london_med_vol": {
+          "n": 181,
+          "accuracy": 0.508
+        },
+        "london_high_vol": {
+          "n": 119,
+          "accuracy": 0.655
+        },
+        "ny_low_vol": {
+          "n": 131,
+          "accuracy": 0.557
+        },
+        "ny_med_vol": {
+          "n": 137,
+          "accuracy": 0.504
+        },
+        "ny_high_vol": {
+          "n": 219,
+          "accuracy": 0.543
+        }
+      },
+      "M5_false_positive": {
+        "n_expired_bars": 6465,
+        "n_boxes_expired": 568,
+        "n_false_positive": 116,
+        "false_positive_pct": 20.42
+      },
+      "M6_cost": {
+        "per_tick_us": 0.081
+      },
+      "walkforward": {
+        "wf_acc_mean": 0.5513486698367609,
+        "wf_acc_std": 0.03971602456764499,
+        "wf_acc_ci_95": [
+          0.5156,
+          0.5819
+        ],
+        "wf_pnl_total_mean": 590.32,
+        "wf_pnl_ci_95": [
+          -439.6,
+          2044.9
+        ],
+        "n_folds": 5
+      }
+    }
+  ],
+  "bonferroni_significant_winners": [],
+  "p0_cross_ref": {
+    "n_blocks_post_p0": 46,
+    "n_unblocked_per_rule": {
+      "A_K3": 46,
+      "B_T4": 46,
+      "C_K3T4": 46,
+      "D_lam01": 46
+    }
+  },
+  "wf_folds": [
+    {
+      "fold": 0,
+      "test_start": 0,
+      "test_end": 1801,
+      "n_train": 7157,
+      "n_test": 1801,
+      "test_atr_dist": {
+        "low_vol": 0.88,
+        "med_vol": 0.11,
+        "high_vol": 0.01
+      }
+    },
+    {
+      "fold": 1,
+      "test_start": 1801,
+      "test_end": 3602,
+      "n_train": 7109,
+      "n_test": 1801,
+      "test_atr_dist": {
+        "low_vol": 0.54,
+        "med_vol": 0.36,
+        "high_vol": 0.1
+      }
+    },
+    {
+      "fold": 2,
+      "test_start": 3602,
+      "test_end": 5403,
+      "n_train": 7109,
+      "n_test": 1801,
+      "test_atr_dist": {
+        "med_vol": 0.44,
+        "high_vol": 0.43,
+        "low_vol": 0.13
+      }
+    },
+    {
+      "fold": 3,
+      "test_start": 5403,
+      "test_end": 7204,
+      "n_train": 7109,
+      "n_test": 1801,
+      "test_atr_dist": {
+        "high_vol": 0.51,
+        "med_vol": 0.41,
+        "low_vol": 0.08
+      }
+    },
+    {
+      "fold": 4,
+      "test_start": 7204,
+      "test_end": 9006,
+      "n_train": 7156,
+      "n_test": 1802,
+      "test_atr_dist": {
+        "high_vol": 0.64,
+        "med_vol": 0.33,
+        "low_vol": 0.03
+      }
+    }
+  ]
+}

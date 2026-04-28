@@ -1,0 +1,225 @@
+{
+  "construction": {
+    "A_expire_when": "excursion_over_atr > 2.0",
+    "C_AND_expire_when": "excursion_over_atr > 2.0 AND box_age_h > 8.0",
+    "states": [
+      "VALID",
+      "SUSPECT",
+      "EXPIRED",
+      "NA"
+    ]
+  },
+  "V1_distribution": {
+    "VALID": {
+      "n": 6242,
+      "pct": 69.31
+    },
+    "SUSPECT": {
+      "n": 1291,
+      "pct": 14.33
+    },
+    "EXPIRED": {
+      "n": 1076,
+      "pct": 11.95
+    },
+    "NA": {
+      "n": 397,
+      "pct": 4.41
+    }
+  },
+  "V2_per_state_accuracy": {
+    "VALID": {
+      "n": 3207,
+      "accuracy": 0.5513,
+      "pct_total": 69.31,
+      "n_total_in_state": 6242
+    },
+    "SUSPECT": {
+      "n": 718,
+      "accuracy": 0.5042,
+      "pct_total": 14.33,
+      "n_total_in_state": 1291
+    },
+    "EXPIRED": {
+      "n": 275,
+      "accuracy": 0.5127,
+      "pct_total": 11.95,
+      "n_total_in_state": 1076
+    },
+    "NA": {
+      "n": 0,
+      "accuracy": NaN,
+      "pct_total": 4.41
+    }
+  },
+  "V3_subgroup_stability": {
+    "VALID": {
+      "asian_low_vol": {
+        "n": 398,
+        "acc": 0.4975
+      },
+      "asian_med_vol": {
+        "n": 264,
+        "acc": 0.625
+      },
+      "asian_high_vol": {
+        "n": 299,
+        "acc": 0.6288
+      },
+      "london_low_vol": {
+        "n": 255,
+        "acc": 0.4784
+      },
+      "london_med_vol": {
+        "n": 320,
+        "acc": 0.5219
+      },
+      "london_high_vol": {
+        "n": 185,
+        "acc": 0.6054
+      },
+      "ny_low_vol": {
+        "n": 178,
+        "acc": 0.5337
+      },
+      "ny_med_vol": {
+        "n": 216,
+        "acc": 0.537
+      },
+      "ny_high_vol": {
+        "n": 265,
+        "acc": 0.5396
+      },
+      "off_low_vol": {
+        "n": 284,
+        "acc": 0.6549
+      },
+      "off_med_vol": {
+        "n": 238,
+        "acc": 0.4916
+      },
+      "off_high_vol": {
+        "n": 305,
+        "acc": 0.5213
+      }
+    },
+    "SUSPECT": {
+      "asian_low_vol": {
+        "n": 41,
+        "acc": 0.561
+      },
+      "asian_med_vol": {
+        "n": 38,
+        "acc": 0.5
+      },
+      "asian_high_vol": {
+        "n": 52,
+        "acc": 0.3077
+      },
+      "london_low_vol": {
+        "n": 53,
+        "acc": 0.3962
+      },
+      "london_med_vol": {
+        "n": 26,
+        "acc": 0.3077
+      },
+      "london_high_vol": {
+        "n": 70,
+        "acc": 0.7857
+      },
+      "ny_low_vol": {
+        "n": 28,
+        "acc": 0.5357
+      },
+      "ny_med_vol": {
+        "n": 68,
+        "acc": 0.5294
+      },
+      "ny_high_vol": {
+        "n": 93,
+        "acc": 0.4301
+      },
+      "off_low_vol": {
+        "n": 109,
+        "acc": 0.5872
+      },
+      "off_med_vol": {
+        "n": 74,
+        "acc": 0.4459
+      },
+      "off_high_vol": {
+        "n": 66,
+        "acc": 0.4848
+      }
+    },
+    "EXPIRED": {
+      "asian_low_vol": {
+        "n": 18,
+        "acc": 0.3889
+      },
+      "asian_high_vol": {
+        "n": 39,
+        "acc": 0.5641
+      },
+      "london_low_vol": {
+        "n": 44,
+        "acc": 0.3182
+      },
+      "london_med_vol": {
+        "n": 10,
+        "acc": 0.6
+      },
+      "london_high_vol": {
+        "n": 10,
+        "acc": 0.3
+      },
+      "ny_med_vol": {
+        "n": 27,
+        "acc": 0.8519
+      },
+      "ny_high_vol": {
+        "n": 51,
+        "acc": 0.5686
+      },
+      "off_low_vol": {
+        "n": 18,
+        "acc": 0.6667
+      },
+      "off_med_vol": {
+        "n": 12,
+        "acc": 0.5
+      },
+      "off_high_vol": {
+        "n": 31,
+        "acc": 0.5161
+      }
+    }
+  },
+  "V4_pnl_comparison": {
+    "binary_baseline_AK2": {
+      "n_converted": 993,
+      "total_pnl_5x1": 2470.9,
+      "total_pnl_3x1": 1767.7,
+      "monthly_pnl_5x1": 247.1,
+      "monthly_pnl_3x1": 176.8
+    },
+    "tri_state_weighted": {
+      "n_suspect": 718,
+      "n_expired": 275,
+      "mean_pnl_5x1_suspect": 2.73,
+      "mean_pnl_5x1_expired": 1.86,
+      "total_pnl_5x1": 1491.5,
+      "total_pnl_3x1": 1083.2,
+      "monthly_pnl_5x1": 149.2,
+      "monthly_pnl_3x1": 108.3
+    },
+    "delta_tri_vs_binary_5x1_total": -979.4,
+    "delta_tri_vs_binary_5x1_monthly": -97.9
+  },
+  "V5_cost": {
+    "A_standalone_us": 0.142,
+    "tri_state_us": 0.121,
+    "ratio": 0.85
+  }
+}
