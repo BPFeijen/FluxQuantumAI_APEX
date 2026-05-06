@@ -3549,12 +3549,15 @@ class EventProcessor:
 
             # TREND requires ALL:
             #   1. Current box confirmed (multi-leg expansion validated)
-            #   2. Daily trend direction known
+            #   2. Resolved trend direction known (5-layer cascade per spec)
             #   3. Structural acceptance: successive boxes with progressive FMVs
             #   4. PATCH 1: temporal acceptance — price outside box for N bars
-            if confirmed and self.daily_trend in ("long", "short"):
-                if self._detect_box_ladder(self.daily_trend):
+            resolved_trend, trend_source, trend_confidence = self._resolve_trend_direction()
+            if confirmed and resolved_trend in ("long", "short"):
+                if self._detect_box_ladder(resolved_trend):
                     if self._bars_outside_box >= self._TREND_ACCEPTANCE_MIN_BARS:
+                        log.info("[PHASE_ENGINE] TREND via %s (confidence=%s)",
+                                 trend_source, trend_confidence)
                         return "TREND"
                     # Ladder OK but not enough time outside box yet
                     log.debug("[PHASE_ENGINE] TREND blocked: bars_outside=%d < %d required",
@@ -3646,10 +3649,51 @@ class EventProcessor:
     # STRATEGY SELECTOR -- Sprint 8: Dual Strategy (Range + Trend)
     # ------------------------------------------------------------------
 
+    def _resolve_trend_direction(self) -> tuple:
+        """
+        5-layer cascade resolver per spec bug_cascade_direction_fallback_spec.md §3.
+
+        Returns (trend, source, confidence) where:
+          trend ∈ {"long", "short", "unknown"}
+          source: descriptor for audit trail
+          confidence ∈ {"HIGH", "MEDIUM", "LOW", "NONE"}
+        """
+        # Layer 1: daily_trend (B+C ENSEMBLE) — HIGH
+        if self.daily_trend in ("long", "short"):
+            return (self.daily_trend, "daily_trend_b_c_ensemble", "HIGH")
+
+        # Layer 2: TickBreakoutMonitor real-time — HIGH
+        if self._thresholds.get("direction_fallback_use_tick_breakout", True):
+            try:
+                tb = self._tick_breakout.status() if getattr(self, "_tick_breakout", None) else None
+                if tb and tb.get("state") in ("BREAKOUT_UP", "BREAKOUT_DN"):
+                    trend = "long" if tb["state"] == "BREAKOUT_UP" else "short"
+                    return (trend, "tick_breakout_monitor", "HIGH")
+            except Exception as e:
+                log.debug("tick_breakout resolve failed: %s", e)
+
+        # Layer 3: m30_bias_confirmed — MEDIUM
+        m30b = getattr(self, "m30_bias", "unknown")
+        m30c = getattr(self, "m30_bias_confirmed", False)
+        if m30c and m30b in ("bullish", "bearish"):
+            trend = "long" if m30b == "bullish" else "short"
+            return (trend, "m30_bias_confirmed", "MEDIUM")
+
+        # Layer 4: provisional_m30_bias (telemetry → soft-block upgrade) — LOW
+        if self._thresholds.get("direction_fallback_use_provisional_m30", True):
+            prov = getattr(self, "provisional_m30_bias", "unknown")
+            if prov in ("bullish", "bearish"):
+                trend = "long" if prov == "bullish" else "short"
+                return (trend, "provisional_m30_bias", "LOW")
+
+        # Layer 5: default
+        return ("unknown", "no_trend_signal", "NONE")
+
     def _get_strategy_mode(self) -> tuple:
         """
-        Determine which strategy to use based on phase and daily trend.
+        Determine which strategy to use based on phase and resolved trend direction.
         Source: ATS Basic Strategy - Two Problems to Solve
+        Cascade: see _resolve_trend_direction() — spec bug_cascade_direction_fallback_spec.md.
 
         Returns:
             tuple: (strategy_mode, trend_direction)
@@ -3661,24 +3705,29 @@ class EventProcessor:
 
         phase = self._get_current_phase()
         self._last_phase = phase
-        daily_trend = self.daily_trend  # "long", "short", or ""
+        resolved_trend, trend_source, trend_confidence = self._resolve_trend_direction()
 
         # CONTRACTION: always Range-Bound (ATS Strategy 1)
         if phase == "CONTRACTION":
             return ("RANGE_BOUND", None)
 
-        # TREND with confirmed daily_trend: Trending strategy (ATS Strategy 2)
-        if phase == "TREND" and daily_trend in ("long", "short"):
-            trend_dir = "LONG" if daily_trend == "long" else "SHORT"
+        # TREND with resolved trend (HIGH/MEDIUM/LOW): Trending strategy (ATS Strategy 2)
+        if phase == "TREND" and resolved_trend in ("long", "short"):
+            trend_dir = "LONG" if resolved_trend == "long" else "SHORT"
+            log.info("[STRATEGY] TRENDING via %s (confidence=%s) dir=%s",
+                     trend_source, trend_confidence, trend_dir)
             return ("TRENDING", trend_dir)
 
-        # EXPANSION with daily_trend: treat as trending
-        # ATS: "You can get away with trading this if you have big multi-leg expansions"
-        if phase == "EXPANSION" and daily_trend in ("long", "short"):
-            trend_dir = "LONG" if daily_trend == "long" else "SHORT"
+        # EXPANSION with resolved trend: treat as trending
+        if phase == "EXPANSION" and resolved_trend in ("long", "short"):
+            trend_dir = "LONG" if resolved_trend == "long" else "SHORT"
+            log.info("[STRATEGY] TRENDING via %s (confidence=%s) dir=%s [EXPANSION]",
+                     trend_source, trend_confidence, trend_dir)
             return ("TRENDING", trend_dir)
 
-        # No clear trend: Range-Bound for safety
+        # No clear trend: Range-Bound for safety (logged, no longer silent)
+        log.info("[STRATEGY] RANGE_BOUND fallback: phase=%s resolved=%s source=%s",
+                 phase, resolved_trend, trend_source)
         return ("RANGE_BOUND", None)
 
     def _resolve_direction(self, level_type: str) -> tuple:
@@ -3698,6 +3747,28 @@ class EventProcessor:
             # ATS Strategy 1: Market Maker / Reversal
             # "Accumulate against deviation, liquidate at value"
             direction = "SHORT" if level_type == "liq_top" else "LONG"
+
+            # F-asymmetric bias filter (Wade canon: trades só na direcção do bias).
+            # Spec bug_cascade_direction_fallback_spec.md / ML-DS 1214590148833737.
+            # When the cascade resolves a directional bias, block counter-trend
+            # mean-reversion (e.g. SHORT@liq_top during bullish rally) but
+            # allow aligned mean-reversion (e.g. SHORT@liq_top in bearish range)
+            # and preserve true Strategy 1 when resolved=unknown.
+            if self._thresholds.get("range_bound_bias_filter_enabled", True):
+                _resolved_trend, _bias_src, _bias_conf = self._resolve_trend_direction()
+                if _resolved_trend == "long" and direction == "SHORT":
+                    log.info("[RANGE_BIAS_BLOCK] counter-bull SHORT skipped "
+                             "(resolved=long via %s confidence=%s level=%s)",
+                             _bias_src, _bias_conf, level_type)
+                    return (None, "RANGE_BOUND_BIAS_BLOCK: counter-bull SHORT blocked "
+                            f"(resolved=long via {_bias_src} {_bias_conf})")
+                if _resolved_trend == "short" and direction == "LONG":
+                    log.info("[RANGE_BIAS_BLOCK] counter-bear LONG skipped "
+                             "(resolved=short via %s confidence=%s level=%s)",
+                             _bias_src, _bias_conf, level_type)
+                    return (None, "RANGE_BOUND_BIAS_BLOCK: counter-bear LONG blocked "
+                            f"(resolved=short via {_bias_src} {_bias_conf})")
+
             reason = "RANGE_BOUND: %s -> %s (reversal to FMV)" % (level_type, direction)
 
         elif strategy_mode == "TRENDING":
