@@ -3801,6 +3801,19 @@ class EventProcessor:
                 if trend_direction == "LONG" and level_type == "liq_top":
                     overext_pts = abs(xau_price - self.liq_top) if self.liq_top else 0
                     if overext_pts > overext_thr:
+                        # F-asymmetric extension (ML-DS 1214598376829822): the
+                        # overextension reversal fires SHORT counter to a confirmed
+                        # bullish bias. Block when the cascade resolves a bullish
+                        # trend so we don't trade against the dominant move.
+                        if self._thresholds.get("range_bound_bias_filter_enabled", True):
+                            _resolved_trend, _bias_src, _bias_conf = self._resolve_trend_direction()
+                            if _resolved_trend == "long":
+                                log.info("[TRENDING_BIAS_BLOCK] counter-bull SHORT skipped "
+                                         "(resolved=long via %s confidence=%s overext=%.1fpts)",
+                                         _bias_src, _bias_conf, overext_pts)
+                                return (None,
+                                        "TRENDING_BIAS_BLOCK: counter-bull SHORT blocked "
+                                        f"(resolved=long via {_bias_src} {_bias_conf})")
                         direction = "SHORT"
                         reason = ("TRENDING_UP: liq_top OVEREXTENDED %.1fpts > %.1f (%.1f*ATR) "
                                   "-> reversal allowed" % (overext_pts, overext_thr, overext_mult))
@@ -3811,6 +3824,18 @@ class EventProcessor:
                 elif trend_direction == "SHORT" and level_type == "liq_bot":
                     overext_pts = abs(self.liq_bot - xau_price) if self.liq_bot else 0
                     if overext_pts > overext_thr:
+                        # F-asymmetric extension (ML-DS 1214598376829822): block
+                        # counter-bear LONG on overextension reversal when cascade
+                        # resolves bearish.
+                        if self._thresholds.get("range_bound_bias_filter_enabled", True):
+                            _resolved_trend, _bias_src, _bias_conf = self._resolve_trend_direction()
+                            if _resolved_trend == "short":
+                                log.info("[TRENDING_BIAS_BLOCK] counter-bear LONG skipped "
+                                         "(resolved=short via %s confidence=%s overext=%.1fpts)",
+                                         _bias_src, _bias_conf, overext_pts)
+                                return (None,
+                                        "TRENDING_BIAS_BLOCK: counter-bear LONG blocked "
+                                        f"(resolved=short via {_bias_src} {_bias_conf})")
                         direction = "LONG"
                         reason = ("TRENDING_DN: liq_bot OVEREXTENDED %.1fpts > %.1f (%.1f*ATR) "
                                   "-> reversal allowed" % (overext_pts, overext_thr, overext_mult))

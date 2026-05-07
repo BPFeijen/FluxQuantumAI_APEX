@@ -380,3 +380,69 @@ def test_range_bias_disabled_via_flag():
     direction, reason = proc._resolve_direction(level_type="liq_top")
     assert direction == "SHORT"
     assert "BIAS_BLOCK" not in reason
+
+
+# ---------------------------------------------------------------------------
+# F-asymmetric TRENDING extension (ML-DS 1214598376829822)
+# ---------------------------------------------------------------------------
+
+def _patch_trending(proc, trend_dir, *, liq_top=4700.0, liq_bot=4680.0, xau_mid=4750.0, atr_m30=10.0):
+    """Force strategy_mode=TRENDING and TREND phase, with overextended price."""
+    proc._get_strategy_mode = lambda: ("TRENDING", trend_dir)
+    proc._get_current_phase = lambda: "TREND"
+    proc._last_phase = "TREND"
+    proc.liq_top = liq_top
+    proc.liq_bot = liq_bot
+    proc._metrics = {"xau_mid": xau_mid, "atr_m30_parquet": atr_m30, "atr": atr_m30}
+    # Force _get_trend_entry_mode to return SKIP so we hit the overextension path
+    proc._get_trend_entry_mode = lambda level_type, price, td, decision=None: ("SKIP", None, "skipped for test")
+
+
+def test_trending_bias_blocks_short_when_resolved_long():
+    """TRENDING_LONG + overext SHORT (counter-bull) must be blocked when cascade resolves bullish."""
+    proc = _make_proc(daily_trend="long")  # Layer 1 long
+    _patch_trending(proc, "LONG", liq_top=4700.0, xau_mid=4720.0, atr_m30=5.0)
+    direction, reason = proc._resolve_direction(level_type="liq_top")
+    assert direction is None
+    assert "TRENDING_BIAS_BLOCK" in reason
+    assert "counter-bull" in reason.lower()
+
+
+def test_trending_bias_blocks_long_when_resolved_short():
+    """TRENDING_SHORT + overext LONG (counter-bear) must be blocked when cascade resolves bearish."""
+    proc = _make_proc(daily_trend="short")
+    _patch_trending(proc, "SHORT", liq_bot=4700.0, xau_mid=4680.0, atr_m30=5.0)
+    direction, reason = proc._resolve_direction(level_type="liq_bot")
+    assert direction is None
+    assert "TRENDING_BIAS_BLOCK" in reason
+    assert "counter-bear" in reason.lower()
+
+
+def test_trending_bias_allows_when_not_overextended():
+    """TRENDING_LONG + price NOT overextended → SKIP (not BIAS_BLOCK)."""
+    proc = _make_proc(daily_trend="long")
+    # xau_mid only 2pts above liq_top, ATR 10 * 1.5 = 15 threshold → not overextended
+    _patch_trending(proc, "LONG", liq_top=4700.0, xau_mid=4702.0, atr_m30=10.0)
+    direction, reason = proc._resolve_direction(level_type="liq_top")
+    assert direction is None
+    assert "BIAS_BLOCK" not in reason
+    assert "SKIP" in reason or "liquidation zone" in reason
+
+
+def test_trending_bias_disabled_via_flag():
+    """Flag off → TRENDING bias filter inactive even when overextended counter-trend."""
+    proc = _make_proc(daily_trend="long")
+    proc._thresholds["range_bound_bias_filter_enabled"] = False
+    _patch_trending(proc, "LONG", liq_top=4700.0, xau_mid=4720.0, atr_m30=5.0)
+    direction, reason = proc._resolve_direction(level_type="liq_top")
+    assert direction == "SHORT"
+    assert "BIAS_BLOCK" not in reason
+
+
+def test_trending_bias_blocks_via_layer4_provisional():
+    """Layer 4 provisional bullish should also trigger the TRENDING block (LOW confidence respected)."""
+    proc = _make_proc(daily_trend="unknown", provisional_m30_bias="bullish")
+    _patch_trending(proc, "LONG", liq_top=4700.0, xau_mid=4720.0, atr_m30=5.0)
+    direction, reason = proc._resolve_direction(level_type="liq_top")
+    assert direction is None
+    assert "TRENDING_BIAS_BLOCK" in reason
