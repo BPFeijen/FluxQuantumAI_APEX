@@ -92,12 +92,40 @@ Changes to `api.py`:
 
 Backups: `index.html.bak_post_w36b_20260510`, `api.py.bak_post_w36b_20260510`.
 
+## Frontend update v2 — same date follow-up
+
+Per Barbara feedback after seeing first version:
+
+1. **Gold Imp column removed**. The score I was producing (0..3+ via
+   `impact × venue × keyword_boost`) was a **heuristic I invented**, not
+   data-driven. Barbara had previously corrected me on calibrated-vs-
+   heuristic, so this column was acknowledged as a regression and removed.
+   Tier (BLOCK/CAUTION/MONITOR) removed too — was derived from the same
+   heuristic.
+2. **Impact column** now shows `low / medium / high` straight from Finnhub
+   (their own classification). Color coding kept (red high, yellow medium,
+   gray low) but values are no longer derived.
+3. **Timing humanised**: `1047m` → `17h 27m`; `2243m` → `1d 13h 23m`;
+   `45m` → `45m`. Helper `fmtTiming(mins)` in JS:
+   - days when ≥1440min, then `Xd Yh`
+   - hours when ≥60min, then `Xh Ym`
+   - minutes only otherwise
+4. **US-only filter**. `news_config.yaml` `finnhub.countries` reduced to
+   `["US"]` per Barbara: "nenhum outro pais tem impacto substancial no Gold".
+5. Future calibration: a proper G-PURDUE calibration of "gold impact" weights
+   from historical XAU price reactions remains valuable and was accepted as
+   a separate work item. NOT done in this session.
+
+Backups: `*.bak_post_w36c_20260510`.
+
 ## Sign-off
 
 - [x] Finnhub key validates against API (40 events fetched directly)
 - [x] AV new key validates (sentiment fetched in test)
 - [x] /api/news returns 15 events + sentiment after dashboard restart
 - [x] All previously-loaded events (NFP/FOMC/etc) for the next 2 days are present
+- [x] Heuristic gold_importance + tier removed; Impact shown as raw Finnhub level
+- [x] Timing humanised; US-only filter applied
 - [ ] Frontend visual confirmation by Barbara at http://149.102.153.10:8088/
 
 ## Rate-limit notes (operator awareness)
