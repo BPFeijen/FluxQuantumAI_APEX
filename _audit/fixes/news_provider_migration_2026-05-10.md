@@ -71,6 +71,27 @@ $ curl -s http://149.102.153.10:8088/api/news | jq
 Total 15 events visible (capped per existing dashboard convention). Gold
 sentiment shows current AV score for GLD/IAU tickers.
 
+## Frontend update (same date, post-backend)
+
+Per Barbara follow-up: dashboard front-end did not surface the new
+`gold_sentiment` field, and the calendar showed only HH:MM (not the date).
+
+Changes to `C:/FluxQuantumAPEX/dashboard/index.html`:
+- New sentiment banner above the calendar table — shows label (Bullish /
+  Neutral / Bearish) + numeric score with arrow + color coding (green
+  ≥+0.15, red ≤−0.15, gray otherwise)
+- Calendar table gets new `Date` column showing `YYYY-MM-DD · Weekday`
+- Section heading updated "Next 24h" → "Next 48h" (matches the 2-day
+  fetch window in the backend)
+- Empty-state message updated accordingly
+
+Changes to `api.py`:
+- Each event in `/api/news` response now includes `date_et` (ISO YYYY-MM-DD)
+  and `weekday` (Sun/Mon/...) computed in ET timezone for consistency
+  with the existing `time_et` field
+
+Backups: `index.html.bak_post_w36b_20260510`, `api.py.bak_post_w36b_20260510`.
+
 ## Sign-off
 
 - [x] Finnhub key validates against API (40 events fetched directly)
