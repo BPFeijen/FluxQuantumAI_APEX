@@ -2957,12 +2957,33 @@ class EventProcessor:
                     elif direction == "SHORT" and _disp_hi_pre > price:
                         _sl_pre = _disp_hi_pre + 1.0
                     else:
-                        if (direction == "LONG" and _disp_lo_pre >= price) or (direction == "SHORT" and 0 < _disp_hi_pre <= price):
-                            log.warning(
-                                "DISPLACEMENT_SL_FALLBACK_PRE: %s entry=%.2f disp_lo=%.2f disp_hi=%.2f -> default SL",
-                                direction, price, _disp_lo_pre, _disp_hi_pre,
+                        # W2.4 (2026-05-10): displacement não-ativo → reject CONTINUATION
+                        # signal entirely (audit 5/8 P2-5). Cases caught: misoriented
+                        # (LONG with disp_lo>=price OR SHORT with disp_hi<=price) AND
+                        # absent (disp_lo == disp_hi == 0). Was: log+fallback SL; the
+                        # SL fix protected from inversion but kept emitting low-quality
+                        # signal. Now rejects — CONTINUATION strategy is undefined
+                        # without a valid displacement bar.
+                        _disp_invalid_reason_pre = (
+                            "MISORIENTED" if (
+                                (direction == "LONG" and _disp_lo_pre >= price) or
+                                (direction == "SHORT" and 0 < _disp_hi_pre <= price)
                             )
-                        # W4.4: hard_stop_dynamic opt-in
+                            else "ABSENT"
+                        )
+                        log.warning(
+                            "DISPLACEMENT_INVALID_REJECT_SIGNAL_PRE: %s reason=%s entry=%.2f "
+                            "disp_lo=%.2f disp_hi=%.2f — CONTINUATION rejected",
+                            direction, _disp_invalid_reason_pre, price,
+                            _disp_lo_pre, _disp_hi_pre,
+                        )
+                        decision.go = False
+                        decision.reason = (
+                            f"DISPLACEMENT_INVALID_REJECT ({_disp_invalid_reason_pre}): "
+                            f"CONTINUATION {direction} requires valid displacement bar; "
+                            f"disp_lo={_disp_lo_pre:.2f} disp_hi={_disp_hi_pre:.2f} price={price:.2f}"
+                        )
+                        # Placeholder SL/TP for the BLOCK decision_dict (not used since go=False)
                         _sl_dist_pre_a = self._compute_hard_stop_pts(self.sl_pts)
                         _sl_pre = price + _sl_dist_pre_a if direction == "SHORT" else price - _sl_dist_pre_a
                 else:
@@ -3062,14 +3083,27 @@ class EventProcessor:
                 elif direction == "SHORT" and _disp_hi > price:
                     sl = _disp_hi + 1.0  # 1pt buffer above displacement high
                 else:
-                    if (direction == "LONG" and _disp_lo >= price) or (direction == "SHORT" and 0 < _disp_hi <= price):
-                        log.warning(
-                            "DISPLACEMENT_SL_FALLBACK: %s entry=%.2f disp_lo=%.2f disp_hi=%.2f -> default SL (price retraced past displacement)",
-                            direction, price, _disp_lo, _disp_hi,
+                    # W2.4 (2026-05-10): displacement não-ativo → reject CONTINUATION
+                    # signal at execution gate (audit 5/8 P2-5). Mirror of pre-write
+                    # gate above. Returns early before the order is sent. The PRE
+                    # gate at line ~2960 should have caught this already, but this
+                    # is a defense-in-depth check at the actual execution boundary.
+                    _disp_invalid_reason = (
+                        "MISORIENTED" if (
+                            (direction == "LONG" and _disp_lo >= price) or
+                            (direction == "SHORT" and 0 < _disp_hi <= price)
                         )
-                    # W4.4: hard_stop_dynamic opt-in fallback
-                    _sl_dist_live = self._compute_hard_stop_pts(self.sl_pts)
-                    sl = price + _sl_dist_live if direction == "SHORT" else price - _sl_dist_live
+                        else "ABSENT"
+                    )
+                    log.warning(
+                        "DISPLACEMENT_INVALID_REJECT_SIGNAL: %s reason=%s entry=%.2f "
+                        "disp_lo=%.2f disp_hi=%.2f — CONTINUATION rejected at execution gate",
+                        direction, _disp_invalid_reason, price, _disp_lo, _disp_hi,
+                    )
+                    print(f"[{ts}] [DISPLACEMENT_REJECT] {direction} CONTINUATION "
+                          f"reason={_disp_invalid_reason} disp_lo={_disp_lo:.2f} "
+                          f"disp_hi={_disp_hi:.2f} price={price:.2f} — entry rejected")
+                    return  # W2.4: reject CONTINUATION signal entirely
             else:
                 # W4.4: hard_stop_dynamic opt-in fallback
                 _sl_dist_live = self._compute_hard_stop_pts(self.sl_pts)
