@@ -1,0 +1,97 @@
+{
+  "narrow": {
+    "name": "NARROW",
+    "start": "2026-05-05 00:00:00+00:00",
+    "end": "2026-05-09 00:00:00+00:00",
+    "n_m30_rows": 165,
+    "n_confirmed_boxes": 11,
+    "bars_per_box_p25": 2.0,
+    "bars_per_box_p50": 6.0,
+    "bars_per_box_p75": 10.0,
+    "bars_per_box_p90": 14.0,
+    "bars_per_box_min": 1,
+    "bars_per_box_max": 22,
+    "bars_per_box_mean": 7.2727272727272725,
+    "bars_per_box_std": 6.22445191586316,
+    "boxes_per_day_mean": 2.75,
+    "box_lifetime_min_mean": 193.63636363636363,
+    "bias_dist_native": {
+      "bullish": 4,
+      "unknown": 6,
+      "bearish": 1
+    },
+    "regime_dist": {
+      "RANGE": 10,
+      "TREND_UP": 1
+    },
+    "n_decisions_in_window": 9289
+  },
+  "broad": {
+    "name": "BROAD",
+    "start": "2025-07-01 00:00:00+00:00",
+    "end": "2026-05-09 00:00:00+00:00",
+    "n_m30_rows": 9380,
+    "n_confirmed_boxes": 630,
+    "bars_per_box_p25": 2.0,
+    "bars_per_box_p50": 4.0,
+    "bars_per_box_p75": 8.0,
+    "bars_per_box_p90": 12.100000000000023,
+    "bars_per_box_min": 1,
+    "bars_per_box_max": 40,
+    "bars_per_box_mean": 6.017460317460317,
+    "bars_per_box_std": 4.933334610120159,
+    "boxes_per_day_mean": 2.019230769230769,
+    "box_lifetime_min_mean": 189.0952380952381,
+    "bias_dist_native": {
+      "bullish": 215,
+      "bearish": 164,
+      "unknown": 251
+    },
+    "regime_dist": {
+      "RANGE": 552,
+      "TREND_UP": 51,
+      "TREND_DN": 27
+    },
+    "n_decisions_in_window": 37234
+  },
+  "histogram_narrow": {
+    "22": 1,
+    "1": 2,
+    "5": 1,
+    "7": 1,
+    "6": 1,
+    "2": 2,
+    "14": 1,
+    "8": 1,
+    "12": 1
+  },
+  "histogram_broad": {
+    "1": 50,
+    "8": 34,
+    "11": 24,
+    "12": 22,
+    "3": 70,
+    "4": 70,
+    "5": 43,
+    "6": 41,
+    "10": 20,
+    "2": 134,
+    "15": 8,
+    "9": 22,
+    "7": 37,
+    "25": 3,
+    "40": 1,
+    "16": 7,
+    "26": 1,
+    "19": 6,
+    "18": 2,
+    "17": 4,
+    "21": 1,
+    "14": 8,
+    "20": 3,
+    "13": 16,
+    "24": 1,
+    "27": 1,
+    "22": 1
+  }
+}

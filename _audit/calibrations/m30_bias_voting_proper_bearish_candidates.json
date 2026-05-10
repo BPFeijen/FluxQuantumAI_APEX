@@ -1,0 +1,47 @@
+[
+  {
+    "box_id": 5262,
+    "first_conf_ts": "2026-04-28 11:30:00+00:00",
+    "last_ts": "2026-04-28 13:30:00+00:00",
+    "bars": 6,
+    "prev_box_id": 5261,
+    "prev_box_cls": "unknown",
+    "box_high": 4633.1,
+    "box_low": 4617.0,
+    "liq_top": 4633.1,
+    "liq_bot": 4567.6,
+    "price_at_first_conf": 4609.1,
+    "min_price_within_2h": 4569.9,
+    "drop_pts": 39.20000000000073
+  },
+  {
+    "box_id": 5237,
+    "first_conf_ts": "2026-04-17 19:30:00+00:00",
+    "last_ts": "2026-04-19 17:30:00+00:00",
+    "bars": 7,
+    "prev_box_id": 5236,
+    "prev_box_cls": "bearish",
+    "box_high": 4896.8,
+    "box_low": 4875.85,
+    "liq_top": 4896.8,
+    "liq_bot": 4849.549999999999,
+    "price_at_first_conf": 4878.35,
+    "min_price_within_2h": 4849.549999999999,
+    "drop_pts": 28.80000000000109
+  },
+  {
+    "box_id": 5266,
+    "first_conf_ts": "2026-04-29 06:00:00+00:00",
+    "last_ts": "2026-04-29 07:00:00+00:00",
+    "bars": 4,
+    "prev_box_id": 5265,
+    "prev_box_cls": "unknown",
+    "box_high": 4621.0,
+    "box_low": 4609.1,
+    "liq_top": 4621.0,
+    "liq_bot": 4584.2,
+    "price_at_first_conf": 4606.5,
+    "min_price_within_2h": 4581.4,
+    "drop_pts": 25.100000000000364
+  }
+]
