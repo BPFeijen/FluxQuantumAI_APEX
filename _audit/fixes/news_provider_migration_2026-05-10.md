@@ -152,3 +152,20 @@ events = cal.fetch_calendar(date.today().isoformat(),
 print(len(events), 'events')
 "
 ```
+
+## Frontend update v3 — UTC time per Barbara 2026-05-10
+
+User feedback: "Time esta como ET... deveria mostrar UTC".
+
+Changes:
+- `api.py` `/api/news`: event timestamps no longer converted to ET. Keys
+  renamed `date_et` → `date_utc`, `time_et` → `time_utc`. Source data
+  from Finnhub is already UTC, so this is a strip-conversion.
+- `index.html`: section heading "(ET)" → "(UTC)"; renderCalendar reads
+  `date_utc` / `time_utc` (with backwards-compat fallback to old keys);
+  cell suffix " ET" → " UTC".
+
+Verified: `Existing Home Sales` showed `10:00 ET` → now `14:00 UTC`
+(correct +4h conversion).
+
+Backups: `*.bak_post_utc_20260510`.
