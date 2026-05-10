@@ -20,9 +20,13 @@ C:\\FluxQuantumAI\\live\\d1_h4_updater.py
 # is excluded from JAC direction and bias computation.
 #
 # Output:
-#   gc_h4_boxes.parquet — H4 box structure + h4_jac_dir
-#   gc_d1_boxes.parquet — D1 box structure + d1_jac_dir
-#   gc_d1h4_bias.json   — composite bias + metadata
+#   gc_d1h4_bias.json   — composite bias + metadata + d1_atr14 + h4_atr14
+#                         (consumed by event_processor W4-A D1 ATR extreme gate
+#                          and derive_h4_bias staleness fallback)
+#
+# W3.2 (2026-05-10): parquet outputs (gc_h4_boxes.parquet, gc_d1_boxes.parquet)
+# REMOVED per ADR-001 (no execution-shaped data on D1/H4 timeframes). Only the
+# gc_d1h4_bias.json telemetry surface remains, per ADR-002 shadow telemetry.
 #
 # Architecture:
 #   D1 = primary bias (LONG / SHORT / UNKNOWN)
@@ -63,8 +67,8 @@ DATA_DIR   = Path("C:/data")
 M1_PATH    = DATA_DIR / "processed/gc_ohlcv_l2_joined.parquet"
 MICRO_DIR  = Path("C:/data/level2/_gc_xcec")
 
-OUTPUT_H4  = DATA_DIR / "processed/gc_h4_boxes.parquet"
-OUTPUT_D1  = DATA_DIR / "processed/gc_d1_boxes.parquet"
+# W3.2 (2026-05-10): OUTPUT_H4 / OUTPUT_D1 removed (ADR-001 compliance).
+# Only the JSON telemetry surface remains.
 OUTPUT_BIAS = Path("C:/FluxQuantumAI/logs/gc_d1h4_bias.json")
 
 # STALE-D1H4-001 (Asana 1214284204948063) — windowed rebuild design.
@@ -94,23 +98,13 @@ H4_HYSTERESIS_BARS = 2  # 2 x 4h = 8h
 # Update interval
 UPDATE_INTERVAL_S = 300  # 5 minutes
 
-# Staleness thresholds
-H4_STALE_HOURS = 8.0   # H4 parquet older than this = stale
-D1_STALE_HOURS = 48.0  # D1 parquet older than this = stale
+# Staleness thresholds (computed from m1_last_bar timestamp inside bias JSON,
+# not from parquet file mtime — parquets removed per W3.2 ADR-001 cleanup).
+H4_STALE_HOURS = 8.0
+D1_STALE_HOURS = 48.0
 
-H4_OUTPUT_COLS = [
-    'open', 'high', 'low', 'close', 'volume', 'atr14',
-    'h4_liq_top', 'h4_liq_bot', 'h4_fmv',
-    'h4_box_high', 'h4_box_low', 'h4_box_confirmed',
-    'h4_box_id', 'h4_jac_dir',
-]
-
-D1_OUTPUT_COLS = [
-    'open', 'high', 'low', 'close', 'volume', 'atr14',
-    'd1_liq_top', 'd1_liq_bot', 'd1_fmv',
-    'd1_box_high', 'd1_box_low', 'd1_box_confirmed',
-    'd1_box_id', 'd1_jac_dir',
-]
+# W3.2 (2026-05-10): H4_OUTPUT_COLS / D1_OUTPUT_COLS removed — no parquet
+# write surface. The same column set is computed in-memory for the bias JSON.
 
 
 # ---------------------------------------------------------------------------
@@ -491,8 +485,10 @@ def compute_bias(d1_jac: str, h4_jac: str) -> tuple[str, str]:
 # Step 6 — atomic write
 # ---------------------------------------------------------------------------
 
-def _write_parquet_atomic(df: pd.DataFrame, path: Path, cols: list) -> None:
-    """Write parquet atomically via tmp -> rename. 3 retries for Windows locks."""
+def _write_parquet_atomic_DEPRECATED(df: pd.DataFrame, path: Path, cols: list) -> None:
+    """W3.2 (2026-05-10): DEPRECATED — parquet writes removed per ADR-001.
+    Function body kept temporarily for revert safety; remove in next cleanup.
+    Original docstring: write parquet atomically via tmp -> rename."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp.parquet")
     df[cols].to_parquet(tmp)
@@ -551,23 +547,19 @@ def run_update() -> dict:
     # Step 5: composite bias
     bias_dir, bias_strength = compute_bias(d1_jac, h4_jac)
 
-    # Step 6: atomic writes
-    _write_parquet_atomic(h4_boxes, OUTPUT_H4, H4_OUTPUT_COLS)
-    _write_parquet_atomic(d1_boxes, OUTPUT_D1, D1_OUTPUT_COLS)
-
-    # Staleness
-    h4_age_s = -1.0
-    d1_age_s = -1.0
+    # W3.2 (2026-05-10): parquet writes removed per ADR-001. Staleness is now
+    # computed from the m1 last-bar timestamp (the upstream feed) instead of
+    # from output file mtime. If the M1 OHLCV feed is fresh, the derived bias
+    # is fresh by construction.
     try:
-        if OUTPUT_H4.exists():
-            h4_age_s = time.time() - OUTPUT_H4.stat().st_mtime
-        if OUTPUT_D1.exists():
-            d1_age_s = time.time() - OUTPUT_D1.stat().st_mtime
+        m1_last_bar_age_s = (now_utc - m1.index[-1].to_pydatetime()).total_seconds() \
+            if len(m1) else -1.0
     except Exception:
-        pass
-
-    h4_stale = h4_age_s > H4_STALE_HOURS * 3600 if h4_age_s >= 0 else True
-    d1_stale = d1_age_s > D1_STALE_HOURS * 3600 if d1_age_s >= 0 else True
+        m1_last_bar_age_s = -1.0
+    h4_age_s = m1_last_bar_age_s
+    d1_age_s = m1_last_bar_age_s
+    h4_stale = (m1_last_bar_age_s > H4_STALE_HOURS * 3600) if m1_last_bar_age_s >= 0 else True
+    d1_stale = (m1_last_bar_age_s > D1_STALE_HOURS * 3600) if m1_last_bar_age_s >= 0 else True
 
     elapsed = time.monotonic() - t0
 
@@ -605,11 +597,12 @@ def run_update() -> dict:
         "d1_atr14":           round(d1_atr14_last_closed, 4) if d1_atr14_last_closed is not None else None,
         "h4_atr14":           round(h4_atr14_last_closed, 4) if h4_atr14_last_closed is not None else None,
         "data_freshness": {
-            "h4_parquet_age_s": round(h4_age_s, 1),
-            "d1_parquet_age_s": round(d1_age_s, 1),
-            "h4_stale":         h4_stale,
-            "d1_stale":         d1_stale,
-            "m1_last_bar":      m1.index[-1].isoformat() if len(m1) else "?",
+            # W3.2 (2026-05-10): parquet age fields removed (parquets no longer
+            # written per ADR-001). Staleness derived from m1_last_bar age.
+            "m1_last_bar_age_s": round(h4_age_s, 1),
+            "h4_stale":          h4_stale,
+            "d1_stale":          d1_stale,
+            "m1_last_bar":       m1.index[-1].isoformat() if len(m1) else "?",
         },
         "last_closed_h4_ts":  h4_last_closed_ts,
         "last_closed_d1_ts":  d1_last_closed_ts,
