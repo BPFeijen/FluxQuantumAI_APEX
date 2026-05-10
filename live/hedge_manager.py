@@ -500,14 +500,9 @@ class HedgeManager:
                 "decision_id": str(uuid.uuid4())[:8],
             }
 
-            # Atomic write decision_live.json
-            DECISION_LIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
-            _tmp = DECISION_LIVE_PATH.with_suffix(".tmp")
-            with open(_tmp, "w", encoding="utf-8") as f:
-                json.dump(canonical_payload, f, indent=2, default=str)
-            _tmp.replace(DECISION_LIVE_PATH)
-            with open(DECISION_LOG_PATH, "a", encoding="utf-8") as f:
-                f.write(json.dumps(canonical_payload, default=str) + "\n")
+            # W3.1 (2026-05-09): centralized atomic write via live.decision_writer
+            from live.decision_writer import write_decision_atomic
+            write_decision_atomic(canonical_payload)
 
             # Notify Telegram
             try:

@@ -217,7 +217,7 @@ W_ICE_CONTRA        = -4         # iceberg contra at level → -4 (hard contra)
 W_ABS_ALIGNED       = 2          # absorption aligned → +2
 W_ABS_CONTRA        = -3         # absorption contra → -3
 
-MIN_SCORE_GO        = 0          # score >= 0 → GO (neutral or positive)
+MIN_SCORE_GO        = 1          # W1.2 2026-05-09: was 0, raised to 1 to block neutral-score GOs (e.g. iceberg-only score=+4 with mom=0). Spam root cause: 10+ SHORTs in 30s @ MT5 4685.75 on 2026-05-08 from iceberg sc=+4 alone.
 
 # V1 thresholds — dual-mode (FIX 6, 2026-04-08)
 # RANGE mode    : abs(price - level) <= V1_RANGE_DIST_PTS (price near structural level)
@@ -829,19 +829,66 @@ class ATSLiveGate:
             block_reason += (" | " if block_reason else "") + (
                 "COLLISION: %s" % ice.collision_detail)
 
-        # FASE 3 — Breaking Ice (CAL-6, CAL-7) — LOG ONLY
-        if ice.breaking_ice:
-            import logging as _logging
-            _logging.getLogger("apex.gate").info(
-                "[BREAKING_ICE] %s direction=%s (log_only)", ice.breaking_ice_detail, direction)
+        # W5.1 (2026-05-09) — Breaking Ice + Iceberg Zones ARMED (Opção A score modifier)
+        # Was log_only (FASE 3 CAL-6/7/8 deploy 2026-04-21 commit 3e80ed6 "Production
+        # snapshot before stabilization sprint"). Per Barbara directive 2026-05-09:
+        # "iceberg é extremamente importante" — shadows são features faltando.
+        #
+        # Breaking Ice ALIGNED with trade direction = +1 (institutional level broken
+        # in our favor; confirms momentum). CONTRA = -2 (price broke against us;
+        # warning that opposing momentum may continue).
+        # Iceberg Zone IN ZONE (≤5pts) ALIGNED = +1 (proximity to recent institutional
+        # positioning aligns with trade). CONTRA = -1 (institutional contra near).
+        import logging as _logging
+        _ice_log = _logging.getLogger("apex.gate")
+        _bi_score = 0
+        _iz_score = 0
 
-        # FASE 3 — Iceberg Zones proximity (CAL-8) — LOG ONLY
+        # --- Breaking Ice score ---
+        if ice.breaking_ice:
+            _bi_aligned = (
+                (ice.breaking_ice_side == "bullish" and direction == "LONG") or
+                (ice.breaking_ice_side == "bearish" and direction == "SHORT")
+            )
+            _bi_contra = (
+                (ice.breaking_ice_side == "bullish" and direction == "SHORT") or
+                (ice.breaking_ice_side == "bearish" and direction == "LONG")
+            )
+            if _bi_aligned:
+                _bi_score = 1
+                _ice_log.info("[BREAKING_ICE] ARMED ALIGNED %s dir=%s -> +1 score",
+                              ice.breaking_ice_detail, direction)
+            elif _bi_contra:
+                _bi_score = -2
+                _ice_log.info("[BREAKING_ICE] ARMED CONTRA %s dir=%s -> -2 score",
+                              ice.breaking_ice_detail, direction)
+            total_score += _bi_score
+
+        # --- Iceberg Zone score ---
         if ice.iceberg_zone_dist >= 0:
             _in_zone = ice.iceberg_zone_dist <= 5.0  # ICEBERG_ZONES_PROX
-            import logging as _logging
-            _logging.getLogger("apex.gate").info(
-                "[ICEBERG_ZONE] dist=%.1fpts in_zone=%s direction=%s (log_only)",
-                ice.iceberg_zone_dist, _in_zone, direction)
+            if _in_zone:
+                # BID iceberg = support (aligns with LONG); ASK = resistance (aligns with SHORT)
+                _iz_aligned = (
+                    (ice.iceberg_zone_side == "bid" and direction == "LONG") or
+                    (ice.iceberg_zone_side == "ask" and direction == "SHORT")
+                )
+                _iz_contra = (
+                    (ice.iceberg_zone_side == "bid" and direction == "SHORT") or
+                    (ice.iceberg_zone_side == "ask" and direction == "LONG")
+                )
+                if _iz_aligned:
+                    _iz_score = 1
+                    _ice_log.info("[ICEBERG_ZONE] ARMED ALIGNED dist=%.1fpts side=%s dir=%s -> +1 score",
+                                  ice.iceberg_zone_dist, ice.iceberg_zone_side, direction)
+                elif _iz_contra:
+                    _iz_score = -1
+                    _ice_log.info("[ICEBERG_ZONE] ARMED CONTRA dist=%.1fpts side=%s dir=%s -> -1 score",
+                                  ice.iceberg_zone_dist, ice.iceberg_zone_side, direction)
+                total_score += _iz_score
+            else:
+                _ice_log.debug("[ICEBERG_ZONE] dist=%.1fpts side=%s dir=%s (not in zone, no score)",
+                               ice.iceberg_zone_dist, ice.iceberg_zone_side, direction)
 
         # --- Grenadier Guardrail: Stat-Guardrail (Sprint 1 — The Shield) ---
         # O(1) deterministic check — runs before V4 even when V1-V3 already blocked.

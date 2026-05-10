@@ -54,7 +54,7 @@ log = logging.getLogger("apex.executor.ctrader")
 # ---------------------------------------------------------------------------
 # Constants — kept structurally identical to mt5_executor for compat
 # ---------------------------------------------------------------------------
-SYMBOL    = "GC"               # NATIVE on IC Markets cTrader (NOT XAUUSD)
+SYMBOL    = os.environ.get("CTRADER_SYMBOL", "GCM26")  # GC front-month futures (Jun 2026); was "GC" generic which doesn't match any account symbol. Update CTRADER_SYMBOL env var when contract rolls (e.g. GCQ26 = Aug 2026 next).
 LOT_SIZE  = 0.02
 COMMENT   = "APEX"
 MAGIC     = 20260331
@@ -218,7 +218,12 @@ class CTraderExecutor:
 
     def _sync_send(self, message, timeout: float = 10.0):
         """Block calling thread until response Deferred fires. Returns the
-        protobuf response message OR raises RuntimeError on failure/timeout."""
+        TYPED protobuf response (after Protobuf.extract envelope unwrap) OR
+        raises RuntimeError on failure/timeout.
+
+        Fix 2026-05-09: cTrader Open API client.send() returns a ProtoMessage
+        envelope; the typed response must be extracted via Protobuf.extract.
+        Without this, callers see 'ProtoMessage object has no attribute X'."""
         if self._client is None or not self._client.isConnected:
             raise RuntimeError("cTrader client not connected")
         result_q: queue.Queue = queue.Queue(maxsize=1)
@@ -237,7 +242,18 @@ class CTraderExecutor:
         except queue.Empty:
             raise RuntimeError(f"cTrader request timeout after {timeout}s")
         if kind == "ok":
-            return val
+            try:
+                from ctrader_open_api import Protobuf
+                typed = Protobuf.extract(val)
+            except Exception:
+                return val
+            # Detect error response and surface real error code/description
+            type_name = type(typed).__name__
+            if "ErrorRes" in type_name:
+                err_code = getattr(typed, "errorCode", "?")
+                desc = getattr(typed, "description", "")
+                raise RuntimeError(f"cTrader API error {err_code}: {desc} (response={type_name})")
+            return typed
         raise RuntimeError(f"cTrader request failed: {val}")
 
     # --- connect -----------------------------------------------------------
@@ -707,22 +723,67 @@ class CTraderExecutor:
 
     def move_to_breakeven(
         self, ticket_leg2: int, ticket_leg3: int, entry_price: float,
+        enable_trailing: bool = True,
     ) -> dict:
+        """SHIELD: move SL to entry price. With cTrader, optionally enable
+        native server-side trailing stop in the same atomic amend (default ON).
+
+        With enable_trailing=True: server maintains current (price - SL)
+        distance as trailing buffer. As price advances, SL advances; never
+        retreats. Eliminates need for manual _modify_sl polling in PM loop.
+        Trailing distance = price_at_amend - entry_price (typically TP1_dist).
+        """
         results: dict = {"success": True, "modified": [], "errors": []}
         for ticket in (ticket_leg2, ticket_leg3):
             if ticket <= 0:
                 continue
-            ok, msg = self._modify_sl(ticket, entry_price)
+            ok, msg = self._modify_sl(ticket, entry_price, trailing=enable_trailing)
             if ok:
                 results["modified"].append(ticket)
-                log.info("SHIELD: SL moved to entry %.2f on positionId %d", entry_price, ticket)
+                _trail_note = " + trailing ON" if enable_trailing else ""
+                log.info("SHIELD: SL moved to entry %.2f on positionId %d%s",
+                         entry_price, ticket, _trail_note)
             else:
                 results["errors"].append("ticket %d: %s" % (ticket, msg))
                 results["success"] = False
                 log.warning("SHIELD failed for positionId %d: %s", ticket, msg)
         return results
 
-    def _modify_sl(self, ticket: int, new_sl: float) -> tuple[bool, str]:
+    def enable_native_trailing(self, ticket: int) -> tuple[bool, str]:
+        """Enable cTrader server-side trailing stop on existing position.
+        Keeps current SL/TP, just sets trailingStopLoss=True. Server then
+        adjusts SL automatically as price advances favorably.
+
+        Use AFTER move_to_breakeven OR on positions where current SL is
+        already at the desired trailing buffer distance from current price.
+        """
+        if not self.connected:
+            return False, "cTrader not connected"
+        try:
+            req = ProtoOAAmendPositionSLTPReq()
+            req.ctidTraderAccountId = self._account_id
+            req.positionId = int(ticket)
+            cached = self._positions_cache.get(int(ticket))
+            if cached and cached.get("sl"):
+                req.stopLoss = float(cached["sl"])
+            if cached and cached.get("tp"):
+                req.takeProfit = float(cached["tp"])
+            req.trailingStopLoss = True
+            self._sync_send(req, timeout=10.0)
+            log.info("Native trailing stop ENABLED on positionId %d", ticket)
+            return True, "ok"
+        except Exception as e:
+            return False, str(e)
+
+    def _modify_sl(self, ticket: int, new_sl: float, trailing: bool = False) -> tuple[bool, str]:
+        """Modify SL on existing position. Optional native trailing.
+
+        Args:
+            new_sl: absolute SL price.
+            trailing: if True, set trailingStopLoss=True (cTrader native
+                      server-side trailing). Server maintains
+                      (current_price - new_sl) distance as buffer.
+        """
         if not self.connected:
             return False, "cTrader not connected"
         try:
@@ -734,6 +795,8 @@ class CTraderExecutor:
             cached = self._positions_cache.get(int(ticket))
             if cached and cached.get("tp"):
                 req.takeProfit = float(cached["tp"])
+            if trailing:
+                req.trailingStopLoss = True
             self._sync_send(req, timeout=10.0)
             if cached:
                 cached["sl"] = float(new_sl)

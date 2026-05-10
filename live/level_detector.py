@@ -53,7 +53,9 @@ GC ↔ XAUUSD offset: GC_mid - XAUUSD_mid ≈ +31 pts (carry premium).
 
 from __future__ import annotations
 
+import json
 import logging
+import math
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -522,65 +524,153 @@ def _get_m30_bias(m30_df: pd.DataFrame | None) -> str:
         return "unknown"
 
 
+# ---------------------------------------------------------------------------
+# m30_bias F-1 + F-3 hysteresis fix (Opção B, calibrated 2026-05-07)
+# Spec: _audit/fixes/opcao_b_phase1_m30_bias_hysteresis_spec.md
+# Calibration: _audit/calibrations/m30_bias_voting_calibration.md
+# ---------------------------------------------------------------------------
+M30_BIAS_VOTING_DEFAULTS = {
+    "m30_bias_min_bars": 5,
+    "m30_bias_voting_window": 5,
+    "m30_bias_voting_strategy": "recency_weighted",
+}
+_M30_BIAS_SETTINGS_PATH = Path("C:/FluxQuantumAI/config/settings.json")
+_M30_BIAS_VOTING_WARN_LOGGED: set[str] = set()
+
+
+def _load_m30_bias_voting_settings() -> tuple[int, int, str]:
+    """Read m30_bias voting params from settings.json with safe fallbacks.
+    Returns (min_bars, window, strategy)."""
+    try:
+        with _M30_BIAS_SETTINGS_PATH.open("r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    except Exception:
+        cfg = {}
+    try:
+        min_bars = int(cfg.get("m30_bias_min_bars", M30_BIAS_VOTING_DEFAULTS["m30_bias_min_bars"]))
+    except (TypeError, ValueError):
+        min_bars = M30_BIAS_VOTING_DEFAULTS["m30_bias_min_bars"]
+    try:
+        window = int(cfg.get("m30_bias_voting_window", M30_BIAS_VOTING_DEFAULTS["m30_bias_voting_window"]))
+    except (TypeError, ValueError):
+        window = M30_BIAS_VOTING_DEFAULTS["m30_bias_voting_window"]
+    strategy = cfg.get("m30_bias_voting_strategy", M30_BIAS_VOTING_DEFAULTS["m30_bias_voting_strategy"])
+    if strategy not in ("majority", "recency_weighted"):
+        if strategy not in _M30_BIAS_VOTING_WARN_LOGGED:
+            log.warning("m30_bias_voting_strategy=%r unknown; using recency_weighted", strategy)
+            _M30_BIAS_VOTING_WARN_LOGGED.add(strategy)
+        strategy = "recency_weighted"
+    return min_bars, window, strategy
+
+
+def _bars_in_box(m30_df: pd.DataFrame, box_id) -> int:
+    """Count rows belonging to a given m30_box_id in the dataframe."""
+    if m30_df is None or m30_df.empty or box_id is None or pd.isna(box_id):
+        return 0
+    try:
+        return int((m30_df["m30_box_id"] == box_id).sum())
+    except Exception:
+        return 0
+
+
+def _classify_box_row(row) -> str:
+    """Existing bull_ext/bear_ext classification (preserved 32343cf semantics)."""
+    box_high = row.get("m30_box_high", float("nan"))
+    box_low  = row.get("m30_box_low",  float("nan"))
+    liq_top  = row.get("m30_liq_top",  float("nan"))
+    liq_bot  = row.get("m30_liq_bot",  float("nan"))
+
+    bull_ext = (
+        not pd.isna(liq_top)
+        and not pd.isna(box_high)
+        and float(liq_top) > float(box_high)
+    )
+    bear_ext = (
+        not pd.isna(liq_bot)
+        and not pd.isna(box_low)
+        and float(liq_bot) < float(box_low)
+    )
+
+    if bull_ext and not bear_ext:
+        return "bullish"
+    if bear_ext and not bull_ext:
+        return "bearish"
+    return "unknown"
+
+
+def _classify_with_min_bars(row, bars_in_box: int, min_bars: int) -> str:
+    """F-1: returns _classify_box_row(row) if bars_in_box >= min_bars else 'unknown'."""
+    if bars_in_box < min_bars:
+        return "unknown"
+    return _classify_box_row(row)
+
+
+def _voting_vote(classifications: list[str], strategy: str) -> str:
+    """F-3: aggregate up to M classifications (oldest->newest) into a single bias.
+
+    - 'majority': strict majority (> half) wins; else 'unknown'
+    - 'recency_weighted': weights [1, 2, ..., M] (newest highest); winner needs
+      total weight > 1.5x the opposing weight; else 'unknown'
+    """
+    if not classifications:
+        return "unknown"
+
+    if strategy == "majority":
+        n = len(classifications)
+        bull = classifications.count("bullish")
+        bear = classifications.count("bearish")
+        if bull > n // 2:
+            return "bullish"
+        if bear > n // 2:
+            return "bearish"
+        return "unknown"
+
+    weights = list(range(1, len(classifications) + 1))
+    bull_w = sum(w for w, c in zip(weights, classifications) if c == "bullish")
+    bear_w = sum(w for w, c in zip(weights, classifications) if c == "bearish")
+    if bull_w > 0 and bull_w > 1.5 * bear_w:
+        return "bullish"
+    if bear_w > 0 and bear_w > 1.5 * bull_w:
+        return "bearish"
+    return "unknown"
+
+
 def derive_m30_bias(
     m30_df: pd.DataFrame | None, confirmed_only: bool = False
 ) -> tuple[str, bool]:
     """
     Shared M30 bias derivation used by both entry and position-monitor paths.
 
+    Confirmed-path now applies F-1 (min_bars threshold) + F-3 (recency-weighted
+    multi-box voting) per Opção B spec. See module-level helpers.
+
     Returns
     -------
     (bias, is_confirmed_source)
       bias: "bullish" | "bearish" | "unknown"
-      is_confirmed_source: True when derived from a confirmed M30 box that
-      is still structurally valid against the latest price.
+      is_confirmed_source: True when derived from confirmed M30 boxes (post-vote)
+      that are still structurally valid against the latest price.
     """
     if m30_df is None or m30_df.empty:
         return "unknown", False
 
-    def _classify(row) -> str:
-        import math
-
-        box_high = row.get("m30_box_high", float("nan"))
-        box_low  = row.get("m30_box_low",  float("nan"))
-        liq_top  = row.get("m30_liq_top",  float("nan"))
-        liq_bot  = row.get("m30_liq_bot",  float("nan"))
-
-        bull_ext = (
-            not math.isnan(liq_top)
-            and not math.isnan(box_high)
-            and liq_top > box_high
-        )
-        bear_ext = (
-            not math.isnan(liq_bot)
-            and not math.isnan(box_low)
-            and liq_bot < box_low
-        )
-
-        if bull_ext and not bear_ext:
-            return "bullish"
-        if bear_ext and not bull_ext:
-            return "bearish"
-        return "unknown"
-
     def _price_vs_box_bias(row, current_gc: float | None) -> str:
         if current_gc is None:
             return "unknown"
-
         try:
             box_high = row.get("m30_box_high", None)
             box_low  = row.get("m30_box_low", None)
-
             if pd.notna(box_high) and current_gc > float(box_high):
                 return "bullish"
             if pd.notna(box_low) and current_gc < float(box_low):
                 return "bearish"
         except Exception:
             return "unknown"
-
         return "unknown"
 
     try:
+        min_bars, window, strategy = _load_m30_bias_voting_settings()
+
         current_gc = _get_current_gc_price()
 
         confirmed = m30_df[m30_df["m30_box_confirmed"] == True]
@@ -592,25 +682,36 @@ def derive_m30_bias(
 
         latest_row = latest_struct.iloc[-1] if not latest_struct.empty else m30_df.iloc[-1]
 
-        # ----- confirmed path -----
+        # ----- confirmed path (F-1 + F-3) -----
         if not confirmed.empty:
-            last_confirmed = confirmed.iloc[-1]
-            confirmed_bias = _classify(last_confirmed)
+            recent_box_ids = (
+                confirmed["m30_box_id"].drop_duplicates().tail(window).tolist()
+            )
+            classifications: list[str] = []
+            for bid in recent_box_ids:
+                sub = confirmed[confirmed["m30_box_id"] == bid]
+                if sub.empty:
+                    continue
+                last_row = sub.iloc[-1]
+                bars = _bars_in_box(m30_df, bid)
+                classifications.append(_classify_with_min_bars(last_row, bars, min_bars))
+
+            confirmed_bias = _voting_vote(classifications, strategy)
             structural_now = _price_vs_box_bias(latest_row, current_gc)
 
-            # If confirmed bias is contradicted by live structure, invalidate it
             if confirmed_bias in ("bullish", "bearish"):
                 if structural_now != "unknown" and structural_now != confirmed_bias:
                     if confirmed_only:
                         return "unknown", False
+                    # fall through to provisional path
                 else:
                     return confirmed_bias, True
 
         if confirmed_only:
             return "unknown", False
 
-        # ----- live/provisional path -----
-        latest_bias = _classify(latest_row)
+        # ----- live/provisional path (UNCHANGED) -----
+        latest_bias = _classify_box_row(latest_row)
         if latest_bias in ("bullish", "bearish"):
             return latest_bias, False
 

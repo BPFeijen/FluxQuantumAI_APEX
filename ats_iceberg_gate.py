@@ -149,7 +149,9 @@ class ATSIcebergSignal:
     collision_detail: str = "none"        # "BID@price ASK@price dist=X.Xpts"
     breaking_ice: bool = False            # True when price exceeded iceberg level
     breaking_ice_detail: str = "none"     # "side@price exceeded by X.Xpts"
+    breaking_ice_side: str = "none"       # W5.1: "bullish" (ASK broken) / "bearish" (BID broken) / "none"
     iceberg_zone_dist: float = -1.0       # Distance to nearest iceberg zone (-1 = no zone)
+    iceberg_zone_side: str = "none"       # W5.1: "bid" (support) / "ask" (resistance) / "none"
 
     def is_hard_block(self) -> bool:
         """True when institutional signal is strongly against trade + high confidence."""
@@ -225,8 +227,12 @@ class ATSIcebergV1:
         breaking = self._check_breaking_ice(entry_price, now, df)
         out.breaking_ice        = breaking["detected"]
         out.breaking_ice_detail = breaking["detail"]
+        out.breaking_ice_side   = breaking.get("side", "none")  # W5.1
 
-        out.iceberg_zone_dist = self._check_zones_proximity(entry_price, now)
+        # W5.1: zones now returns (dist, side) tuple
+        zone_dist, zone_side = self._check_zones_proximity(entry_price, now)
+        out.iceberg_zone_dist = zone_dist
+        out.iceberg_zone_side = zone_side
 
         return out
 
@@ -878,22 +884,27 @@ class ATSIcebergV1:
         for ice in ice_levels:
             ip = ice["price"]
             if ice["side"] == "bid":
-                # BID iceberg = support. Breaking = low went below by > BREAKING_ICE_EXCEED
+                # BID iceberg = support. Breaking = low went below by > BREAKING_ICE_EXCEED.
+                # Bearish breakthrough (support failed, sellers pushed below).
                 min_low = recent_bars["low"].min() if "low" in recent_bars.columns else entry_price
                 exceed = ip - min_low
                 if exceed >= BREAKING_ICE_EXCEED:
                     result["detected"] = True
                     result["detail"] = "BID@%.1f broken by %.1fpts (low=%.1f)" % (ip, exceed, min_low)
+                    result["side"] = "bearish"  # W5.1: side of breakthrough
                     return result
             elif ice["side"] == "ask":
-                # ASK iceberg = resistance. Breaking = high went above by > BREAKING_ICE_EXCEED
+                # ASK iceberg = resistance. Breaking = high went above by > BREAKING_ICE_EXCEED.
+                # Bullish breakthrough (resistance failed, buyers pushed above).
                 max_high = recent_bars["high"].max() if "high" in recent_bars.columns else entry_price
                 exceed = max_high - ip
                 if exceed >= BREAKING_ICE_EXCEED:
                     result["detected"] = True
                     result["detail"] = "ASK@%.1f broken by %.1fpts (high=%.1f)" % (ip, exceed, max_high)
+                    result["side"] = "bullish"  # W5.1: side of breakthrough
                     return result
 
+        result["side"] = "none"
         return result
 
     # ------------------------------------------------------------------
@@ -904,10 +915,14 @@ class ATSIcebergV1:
         self,
         entry_price: float,
         now: pd.Timestamp,
-    ) -> float:
+    ) -> tuple[float, str]:
         """
-        Return distance (pts) to nearest JSONL iceberg within last 30 min.
-        Returns -1 if no iceberg found.
+        Return (distance_pts, side) to nearest JSONL iceberg within last 30 min.
+        Returns (-1, "none") if no iceberg found.
+
+        W5.1 (2026-05-09): added `side` return so downstream score modifier can
+        determine alignment (BID=support → aligns with LONG; ASK=resistance →
+        aligns with SHORT).
         """
         cutoff = now - pd.Timedelta(minutes=30)
         date_str = now.strftime("%Y%m%d")
@@ -923,9 +938,10 @@ class ATSIcebergV1:
                 break
 
         if path is None:
-            return -1.0
+            return (-1.0, "none")
 
         min_dist = float("inf")
+        nearest_side = "none"
         try:
             with open(path) as f:
                 for line in f:
@@ -950,10 +966,13 @@ class ATSIcebergV1:
                     dist = abs(price - entry_price)
                     if dist < min_dist:
                         min_dist = dist
+                        nearest_side = str(rec.get("side", "none")).lower()
         except Exception:
-            return -1.0
+            return (-1.0, "none")
 
-        return min_dist if min_dist < float("inf") else -1.0
+        if min_dist < float("inf"):
+            return (min_dist, nearest_side)
+        return (-1.0, "none")
 
     # ------------------------------------------------------------------
     # Combination

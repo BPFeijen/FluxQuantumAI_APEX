@@ -571,6 +571,29 @@ def run_update() -> dict:
 
     elapsed = time.monotonic() - t0
 
+    # W4-A (2026-05-09) — expose last-closed D1 / H4 ATR14 for downstream
+    # regime gates. Per ADR-002, gc_d1h4_bias.json is the ONLY allowed read
+    # surface for execution-side code; adding ATR14 here keeps the parquet
+    # itself untouched. Used by event_processor._check_pre_entry_gates D1
+    # ATR extreme gate (calibration p95=190.6 from TradeATS d1w1, 2026-05-03).
+    def _last_closed_atr14(df, prefix: str) -> float | None:
+        try:
+            if df is None or df.empty or "atr14" not in df.columns:
+                return None
+            confirmed_col = f"{prefix}_box_confirmed"
+            if confirmed_col in df.columns:
+                conf_df = df[df[confirmed_col] == True]
+                if not conf_df.empty:
+                    val = conf_df["atr14"].dropna().iloc[-1] if not conf_df["atr14"].dropna().empty else None
+                    return float(val) if val is not None else None
+            val = df["atr14"].dropna().iloc[-1] if not df["atr14"].dropna().empty else None
+            return float(val) if val is not None else None
+        except Exception:
+            return None
+
+    d1_atr14_last_closed = _last_closed_atr14(d1_boxes, "d1")
+    h4_atr14_last_closed = _last_closed_atr14(h4_boxes, "h4")
+
     # Full metadata
     bias_data = {
         "timestamp":          now_utc.isoformat(),
@@ -579,6 +602,8 @@ def run_update() -> dict:
         "bias_direction":     bias_dir,
         "bias_strength":      bias_strength,
         "bias_source":        "runtime_d1h4_updater",
+        "d1_atr14":           round(d1_atr14_last_closed, 4) if d1_atr14_last_closed is not None else None,
+        "h4_atr14":           round(h4_atr14_last_closed, 4) if h4_atr14_last_closed is not None else None,
         "data_freshness": {
             "h4_parquet_age_s": round(h4_age_s, 1),
             "d1_parquet_age_s": round(d1_age_s, 1),

@@ -372,14 +372,16 @@ def test_range_bias_inactive_when_resolved_unknown():
     assert "RANGE_BOUND" in reason
 
 
-def test_range_bias_disabled_via_flag():
-    """Flag off → bias filter inactive even when resolved bullish."""
+def test_range_bias_flag_false_is_advisory_only():
+    """W2.6 (2026-05-09): F-asym is always-on. Flag
+    range_bound_bias_filter_enabled=False is now ADVISORY ONLY and must be
+    ignored at runtime. Counter-trend SHORT is still blocked."""
     proc = _make_proc(daily_trend="unknown", provisional_m30_bias="bullish")
     proc._thresholds["range_bound_bias_filter_enabled"] = False
     _patch_range_bound(proc)
     direction, reason = proc._resolve_direction(level_type="liq_top")
-    assert direction == "SHORT"
-    assert "BIAS_BLOCK" not in reason
+    assert direction is None
+    assert "RANGE_BOUND_BIAS_BLOCK" in reason
 
 
 # ---------------------------------------------------------------------------
@@ -429,14 +431,16 @@ def test_trending_bias_allows_when_not_overextended():
     assert "SKIP" in reason or "liquidation zone" in reason
 
 
-def test_trending_bias_disabled_via_flag():
-    """Flag off → TRENDING bias filter inactive even when overextended counter-trend."""
+def test_trending_bias_flag_false_is_advisory_only():
+    """W2.6 (2026-05-09): TRENDING F-asym extension is always-on. Flag
+    range_bound_bias_filter_enabled=False must be IGNORED. Counter-bull SHORT
+    on overextension is still blocked."""
     proc = _make_proc(daily_trend="long")
     proc._thresholds["range_bound_bias_filter_enabled"] = False
     _patch_trending(proc, "LONG", liq_top=4700.0, xau_mid=4720.0, atr_m30=5.0)
     direction, reason = proc._resolve_direction(level_type="liq_top")
-    assert direction == "SHORT"
-    assert "BIAS_BLOCK" not in reason
+    assert direction is None
+    assert "TRENDING_BIAS_BLOCK" in reason
 
 
 def test_trending_bias_blocks_via_layer4_provisional():

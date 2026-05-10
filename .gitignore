@@ -26,5 +26,11 @@ Thumbs.db
 
 # Secrets / local config
 .env
+docs/*Credentials*
+docs/*credentials*
+
+# Replay harness temp buffers
+_audit/backtest/replay_real_may0508/_replay_micro_buffer.csv
+_audit/backtest/replay_real_may0508/_replay_service_state.json
 
 live/telegram_notifier.py

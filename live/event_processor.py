@@ -62,11 +62,22 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 from ats_live_gate import ATSLiveGate
-from mt5_executor import MT5Executor, _split_lots, SYMBOL, MAGIC
+
+# 2026-05-09 broker switch: BROKER=ctrader uses CTraderExecutor (HTTPS API,
+# no Session 0/2 issue, native GC futures). BROKER=mt5 (default) uses
+# MT5Executor (MetaTrader 5 IPC, requires terminal GUI in Session 2).
+# CTraderExecutor exposes the same interface as MT5Executor (drop-in).
+_BROKER = os.environ.get("BROKER", "mt5").lower()
+if _BROKER == "ctrader":
+    from ctrader_executor import CTraderExecutor as MT5Executor, _split_lots, SYMBOL, MAGIC  # noqa: F401
+else:
+    from mt5_executor import MT5Executor, _split_lots, SYMBOL, MAGIC
+
 from live.operational_rules import OperationalRules
 from live.tick_breakout_monitor import TickBreakoutMonitor
 from live.kill_zones import kill_zone_label
 from live.price_speed import PriceSpeedTracker
+from live.decision_writer import write_decision_atomic as _write_decision_atomic, WRITE_LOCK as _DECISION_WRITE_LOCK  # W3.1: centralized writer
 from live.level_detector import (
     derive_m30_bias,
     _get_daily_trend,
@@ -584,6 +595,11 @@ class EventProcessor:
         self._last_trade_level: float = 0.0         # price level of last trade
         self._last_trade_direction: str = ""        # direction of last trade
 
+        # W2.5 (2026-05-09) — Daily loss limit cache
+        # Avoid reading trades.csv on every gate check; refresh every 60s.
+        self._daily_pnl_cache: tuple[float, float] = (0.0, 0.0)  # (computed_at_mono, daily_pnl)
+        self._daily_pnl_ttl_s: float = 60.0
+
         # Dwell Time abort -- CAL-LEVEL-TOUCH 2026-04-10
         # If price stays within NEAR band for > DWELL_ABORT_S without reacting
         # (no move >= DWELL_MOVE_THR pts in the signal direction), the touch is
@@ -719,27 +735,15 @@ class EventProcessor:
           - Target retention: 90 days online minimum (~360 MB projected).
           - Pre-deploy snapshots: scripts/preserve_decision_log.py
           - Any rotation / compaction must be documented in the policy doc first.
+
+        W3.1 (2026-05-09): write logic centralized in live.decision_writer
+        (was duplicated across 4 sites). Lock + atomic rename + append are
+        now handled by write_decision_atomic.
         """
         # Add decision_id and created_at
         decision_data["decision_id"] = str(uuid.uuid4())[:8]
         decision_data["created_at"] = datetime.now(timezone.utc).isoformat()
-
-        # 1. decision_live.json (atomic: tmp -> rename)
-        DECISION_LIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            tmp = DECISION_LIVE_PATH.with_suffix(".tmp")
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(decision_data, f, indent=2, default=str)
-            tmp.replace(DECISION_LIVE_PATH)
-        except Exception as e:
-            log.error("decision_live.json write failed: %s", e)
-
-        # 2. decision_log.jsonl (append)
-        try:
-            with open(DECISION_LOG_PATH, "a", encoding="utf-8") as f:
-                f.write(json.dumps(decision_data, default=str) + "\n")
-        except Exception as e:
-            log.error("decision_log.jsonl append failed: %s", e)
+        _write_decision_atomic(decision_data)
 
     def _read_d1h4_bias_shadow(self) -> dict:
         """Read D1/H4 bias from gc_d1h4_bias.json (FASE 4a shadow). No behavioral impact."""
@@ -1395,13 +1399,8 @@ class EventProcessor:
                     "decision_id": str(uuid.uuid4())[:8],
                 }
 
-                DECISION_LIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
-                _tmp = DECISION_LIVE_PATH.with_suffix(".tmp")
-                with open(_tmp, "w", encoding="utf-8") as f:
-                    json.dump(_canonical_payload, f, indent=2, default=str)
-                _tmp.replace(DECISION_LIVE_PATH)
-                with open(DECISION_LOG_PATH, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(_canonical_payload, default=str) + "\n")
+                # W3.1: centralized writer (was inline atomic + append)
+                _write_decision_atomic(_canonical_payload)
 
                 # Notify Telegram
                 tg.notify_decision()
@@ -1923,6 +1922,108 @@ class EventProcessor:
     # Pre-entry gate -- data-driven thresholds (thresholds_gc.json)
     # ------------------------------------------------------------------
 
+    def _compute_hard_stop_pts(self, default_sl_pts: float) -> float:
+        """W4.4 (2026-05-09) helper: dynamic SL based on day range, fallback to default.
+
+        Per FIT_GAP P8 + ATS Risk Management ("define risk window based on cycle"):
+        when enabled, SL distance scales with day's volatility window instead of
+        being fixed at `sl_pts`. Default OFF (opt-in via settings).
+
+        Formula: sl_pts = clip(day_range * pct, min_pts, max_pts)
+        Example: day_range=40pts, pct=0.20 → 8pts; clipped to min_pts=10 → 10pts.
+
+        Returns the SL distance in points (positive). Fallback to default_sl_pts
+        when disabled, day range unavailable, or computed value invalid.
+        """
+        thr = self._thresholds
+        if not thr.get("hard_stop_dynamic_enabled", False):
+            return default_sl_pts
+        try:
+            hi, lo = self._get_daily_range_today()
+            if hi is None or lo is None or hi <= lo:
+                return default_sl_pts
+            day_range = hi - lo
+            pct = float(thr.get("hard_stop_dynamic_pct", 0.20))
+            min_pts = float(thr.get("hard_stop_dynamic_min_pts", 10.0))
+            max_pts = float(thr.get("hard_stop_dynamic_max_pts", 50.0))
+            dyn = max(min_pts, min(max_pts, day_range * pct))
+            log.debug("HARD_STOP_DYNAMIC: day_range=%.1f pct=%.2f -> %.1fpts (clipped [%.0f,%.0f])",
+                      day_range, pct, dyn, min_pts, max_pts)
+            return dyn
+        except Exception as e:
+            log.debug("hard_stop_dynamic compute error (fallback default): %s", e)
+            return default_sl_pts
+
+    def _get_daily_range_today(self) -> tuple[float | None, float | None]:
+        """W4.2 helper: return (high, low) of current UTC trading day from M5/M30 parquet.
+
+        Uses M30 boxes parquet (already cached as part of the system). Falls back
+        to None if data unavailable. Cached for 60s to avoid re-reading.
+
+        Returns (high, low) in MT5 (XAUUSD) price space.
+        """
+        # Lazy cache attribute
+        if not hasattr(self, "_daily_range_cache"):
+            self._daily_range_cache = (0.0, None, None)  # (computed_at_mono, high, low)
+        _now_mono = time.monotonic()
+        if (_now_mono - self._daily_range_cache[0]) < 60.0:
+            return self._daily_range_cache[1], self._daily_range_cache[2]
+        try:
+            df = pd.read_parquet(M30_BOXES_PATH, columns=["high", "low"])
+            if df.empty:
+                return None, None
+            df.index = pd.to_datetime(df.index, utc=True) if not isinstance(df.index, pd.DatetimeIndex) else df.index
+            today_utc = datetime.now(timezone.utc).date()
+            today_df = df[df.index.date == today_utc]
+            if today_df.empty:
+                return None, None
+            # M30 parquet is in GC space; convert to MT5 by subtracting offset
+            _offset = self._gc_xauusd_offset
+            hi_gc = float(today_df["high"].max())
+            lo_gc = float(today_df["low"].min())
+            hi_mt5 = hi_gc - _offset
+            lo_mt5 = lo_gc - _offset
+            self._daily_range_cache = (_now_mono, hi_mt5, lo_mt5)
+            return hi_mt5, lo_mt5
+        except Exception as e:
+            log.debug("get_daily_range_today error: %s", e)
+            return None, None
+
+    def _compute_daily_pnl(self) -> float:
+        """W2.5 helper: sum PnL of trades closed today (UTC) from trades.csv.
+
+        trades.csv columns: timestamp,asset,direction,decision,lots,entry,sl,tp1,tp2,
+                            result,pnl,gate_score,...
+        We sum the 'pnl' column for rows whose timestamp date == today UTC.
+        Returns 0.0 if file missing / unreadable / no trades today.
+        """
+        try:
+            today_utc = datetime.now(timezone.utc).date()
+            total = 0.0
+            with open(TRADES_CSV, "r", encoding="utf-8", errors="ignore") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    ts_str = row.get("timestamp", "")
+                    pnl_str = row.get("pnl", "")
+                    if not ts_str or not pnl_str:
+                        continue
+                    try:
+                        row_date = datetime.fromisoformat(ts_str).date()
+                    except Exception:
+                        continue
+                    if row_date != today_utc:
+                        continue
+                    try:
+                        total += float(pnl_str)
+                    except (TypeError, ValueError):
+                        continue
+            return total
+        except FileNotFoundError:
+            return 0.0
+        except Exception as e:
+            log.debug("compute_daily_pnl error: %s", e)
+            return 0.0
+
     def _check_pre_entry_gates(self, direction: str, delta_4h: float, price: float) -> tuple[bool, str]:
         """
         Run all pre-entry checks before evaluating the main gate.
@@ -1944,6 +2045,106 @@ class EventProcessor:
                 f"STARTUP COOLDOWN: metrics stabilising, {remaining:.0f}s remaining"
                 f" (delta_4h may be stale -- no trades until cooldown expires)"
             )
+
+        # --- 0b) W2.5 (2026-05-09) Daily loss limit gate ---
+        # Per FIT_GAP P3 + ATS Risk Management: stop trading when day's PnL
+        # falls below configured threshold. Reads trades.csv with 60s cache.
+        if thr.get("daily_loss_limit_enabled", True):
+            _daily_loss_limit = float(thr.get("daily_loss_limit_usd", -50.0))
+            try:
+                _now_mono_dl = time.monotonic()
+                _cache_age = _now_mono_dl - self._daily_pnl_cache[0]
+                if _cache_age > self._daily_pnl_ttl_s:
+                    self._daily_pnl_cache = (_now_mono_dl, self._compute_daily_pnl())
+                _daily_pnl = self._daily_pnl_cache[1]
+                if _daily_pnl < _daily_loss_limit:
+                    return True, (
+                        f"DAILY_LOSS_LIMIT: day PnL=${_daily_pnl:.2f} <= limit=${_daily_loss_limit:.2f} "
+                        f"(no new entries until UTC midnight)"
+                    )
+            except Exception as _dle:
+                log.debug("daily_loss_limit check failed (allowing entry): %s", _dle)
+
+        # --- 0c) W4.3 (2026-05-09) Session close detection ---
+        # Per FIT_GAP P7: block entries in last N minutes before NY session close
+        # (22:00 UTC). Avoid entries that won't have time to develop before
+        # liquidity vacuum.
+        if thr.get("session_close_block_enabled", True):
+            try:
+                _close_block_min = int(thr.get("session_close_block_minutes", 30))
+                _now_utc = datetime.now(timezone.utc)
+                # NY session ends 22:00 UTC. Block window: [22:00 - close_block_min, 22:00).
+                _close_hour = 22
+                _block_start_min = _close_hour * 60 - _close_block_min
+                _now_min_of_day = _now_utc.hour * 60 + _now_utc.minute
+                if _block_start_min <= _now_min_of_day < (_close_hour * 60):
+                    _remaining = _close_hour * 60 - _now_min_of_day
+                    return True, (
+                        f"SESSION_CLOSE_BLOCK: {_remaining}min until NY close (22:00 UTC); "
+                        f"entries blocked in last {_close_block_min}min window"
+                    )
+            except Exception as _scc_e:
+                log.debug("session_close check error (allowing entry): %s", _scc_e)
+
+        # --- 0d) W4.2 (2026-05-09) Daily range gate ---
+        # Per FIT_GAP P6: block entries when price is in lower X% / upper X% of
+        # day's range (avoid chasing extremes). Requires daily high/low; reads
+        # from M30 parquet aggregated for current UTC day.
+        if thr.get("daily_range_block_enabled", True):
+            try:
+                _range_pct = float(thr.get("daily_range_block_pct", 0.20))
+                _hi, _lo = self._get_daily_range_today()
+                if _hi is not None and _lo is not None and _hi > _lo:
+                    _range = _hi - _lo
+                    _lower_band = _lo + _range * _range_pct
+                    _upper_band = _hi - _range * _range_pct
+                    if direction == "LONG" and price >= _upper_band:
+                        return True, (
+                            f"DAILY_RANGE_BLOCK: LONG at price={price:.2f} in upper {_range_pct:.0%} "
+                            f"of day range [{_lo:.2f}, {_hi:.2f}] (chasing extreme)"
+                        )
+                    if direction == "SHORT" and price <= _lower_band:
+                        return True, (
+                            f"DAILY_RANGE_BLOCK: SHORT at price={price:.2f} in lower {_range_pct:.0%} "
+                            f"of day range [{_lo:.2f}, {_hi:.2f}] (chasing extreme)"
+                        )
+            except Exception as _drr_e:
+                log.debug("daily_range check error (allowing entry): %s", _drr_e)
+
+        # --- 0a) W2.1 (2026-05-09) ATR extreme regime gate ---
+        # Per TECH_M30_Framework R4: daily_atr_regime extreme (>45 by default)
+        # blocks entries. M30 ATR scale: normal <=30, high 30-45, extreme >45.
+        # Hardened block — no per-direction asymmetry.
+        if thr.get("m30_atr_extreme_block_enabled", True):
+            _atr_m30_now = float(self._metrics.get("atr_m30_parquet",
+                                                   self._metrics.get("atr", 0.0)) or 0.0)
+            _atr_extreme_pts = float(thr.get("m30_atr_extreme_pts", 45.0))
+            if _atr_m30_now > _atr_extreme_pts:
+                return True, (
+                    f"M30_ATR_EXTREME: atr_m30={_atr_m30_now:.1f} > {_atr_extreme_pts:.1f} "
+                    f"(extreme volatility regime; entry blocked per TECH_M30_Framework R4)"
+                )
+
+        # --- 0a2) W4-A (2026-05-09) Layered D1 ATR extreme gate ---
+        # Calibrated p95 cut from TradeATS d1w1/atr_regime (Youden+bootstrap+CV
+        # over 252 days GC D1 ATR distribution, 2026-05-03):
+        #   p33=65.9 (LOW) | p67=98.6 (HIGH) | p95=190.6 (EXTREME)
+        # Reads d1_atr14 from gc_d1h4_bias.json (ADR-002 SHADOW telemetry
+        # surface; parquets remain forbidden). Belt-and-suspenders with M30
+        # gate above: M30 catches near-term volatility spikes; D1 catches
+        # day-scale extreme regimes that M30 may smooth over.
+        if thr.get("d1_atr_extreme_block_enabled", True):
+            try:
+                _bias = self._read_d1h4_bias_shadow()
+                _d1_atr = _bias.get("d1_atr14") if _bias else None
+                _d1_extreme_pts = float(thr.get("d1_atr_extreme_pts", 190.6))
+                if _d1_atr is not None and float(_d1_atr) > _d1_extreme_pts:
+                    return True, (
+                        f"D1_ATR_EXTREME: d1_atr14={float(_d1_atr):.1f} > {_d1_extreme_pts:.1f} "
+                        f"(P95 calibrated cut; day-scale extreme volatility regime)"
+                    )
+            except Exception as _d1e:
+                log.debug("d1_atr_extreme check error (allowing entry): %s", _d1e)
 
         # --- a0) Sprint 8: Trade cooldown ---
         if thr.get("trade_cooldown_enabled", True):
@@ -2625,36 +2826,19 @@ class EventProcessor:
             log.info("pre-entry blocked: %s", block_reason)
             return
 
-        # -- PLACEHOLDER: CASCADE_N_LEVELS (CAL-PENDING) ----------------------
-        # Calibrated: cascade_N_levels=3, cascade_window=10 (settings.json 2026-04-08)
-        # Intent: if price cascaded through N structural levels within the last
-        # cascade_window M1 bars, the move is classified as trending/cascade --
-        # adjust gate scoring or block reversal entries against the cascade.
-        # TODO: implement cascade detection in level_detector and pass cascade_active
-        # flag here. Architecture decision: block reversal (BLOCK) or reduce score?
-        _cascade_n      = int(self._thresholds.get("cascade_N_levels", 3))
-        _cascade_window = int(self._thresholds.get("cascade_window", 10))
-        # cascade_active = self._check_cascade_levels(direction, _cascade_n, _cascade_window)
-        # if cascade_active:
-        #     print(f"[{ts}] CASCADE_BLOCK {direction}: {_cascade_n} levels broken in {_cascade_window} bars")
-        #     return
-        log.debug("CASCADE placeholder: n=%d window=%d (not yet implemented)", _cascade_n, _cascade_window)
-
-        # -- PLACEHOLDER: VOL_CLIMAX (CAL-PENDING) ----------------------------
-        # Calibrated: vol_climax_multiplier=0.68206, dom_imbalance_threshold=17.03
-        # (raw bar_delta units -- top 1.2% of flow activity, NOT normalized dom_imbalance)
-        # Intent: if current bar_delta exceeds vol_climax_multiplier x rolling_std,
-        # the bar is classified as a volume climax -- potential exhaustion signal that
-        # ENHANCES reversal entry (aligned with CAL-03 finding: high delta = exhaustion).
-        # TODO: compute rolling bar_delta std from df_micro and compare to current bar.
-        # Architecture decision: telemetry only, or +1 score bonus in gate?
+        # -- PLACEHOLDERS deferred to W4 backlog (2026-05-09 W3.4 cleanup) ----
+        # CASCADE_N_LEVELS (cascade_N_levels=3, cascade_window=10) — cascade
+        # detection not yet implemented; spec discussed in CAL-PENDING. Keeping
+        # threshold reads as documentation-of-intent so settings.json keys are
+        # not orphaned, but removed commented-out implementation hints.
+        # VOL_CLIMAX (vol_climax_multiplier=0.68206, dom_imbalance_threshold=17.03)
+        # — also CAL-PENDING; same approach.
+        _cascade_n       = int(self._thresholds.get("cascade_N_levels", 3))
+        _cascade_window  = int(self._thresholds.get("cascade_window", 10))
         _vol_climax_mult = float(self._thresholds.get("vol_climax_multiplier", 0.68206))
         _dom_thr_raw     = float(self._thresholds.get("dom_imbalance_threshold", 17.03))
-        # bar_delta = self._metrics.get("bar_delta", 0.0)
-        # vol_climax_active = abs(bar_delta) > _dom_thr_raw  (raw bar_delta units)
-        # if vol_climax_active:
-        #     print(f"[{ts}] VOL_CLIMAX {direction}: bar_delta={bar_delta:.0f} > {_dom_thr_raw:.1f}")
-        log.debug("VOL_CLIMAX placeholder: mult=%.3f dom_thr=%.2f (not yet implemented)", _vol_climax_mult, _dom_thr_raw)
+        log.debug("CASCADE/VOL_CLIMAX placeholders not yet active (W4 backlog): cascade_n=%d window=%d vol_mult=%.3f dom_thr=%.2f",
+                  _cascade_n, _cascade_window, _vol_climax_mult, _dom_thr_raw)
 
         try:
             _exp_lines_gc = self._compute_expansion_lines(direction)
@@ -2768,18 +2952,29 @@ class EventProcessor:
                         _, _, _disp_lo_pre, _disp_hi_pre = self._detect_trend_displacement(direction)
                     except Exception:
                         _disp_lo_pre, _disp_hi_pre = 0.0, 0.0
-                    if direction == "LONG" and _disp_lo_pre > 0:
+                    if direction == "LONG" and 0 < _disp_lo_pre < price:
                         _sl_pre = _disp_lo_pre - 1.0
-                    elif direction == "SHORT" and _disp_hi_pre > 0:
+                    elif direction == "SHORT" and _disp_hi_pre > price:
                         _sl_pre = _disp_hi_pre + 1.0
                     else:
-                        _sl_pre = price + self.sl_pts if direction == "SHORT" else price - self.sl_pts
+                        if (direction == "LONG" and _disp_lo_pre >= price) or (direction == "SHORT" and 0 < _disp_hi_pre <= price):
+                            log.warning(
+                                "DISPLACEMENT_SL_FALLBACK_PRE: %s entry=%.2f disp_lo=%.2f disp_hi=%.2f -> default SL",
+                                direction, price, _disp_lo_pre, _disp_hi_pre,
+                            )
+                        # W4.4: hard_stop_dynamic opt-in
+                        _sl_dist_pre_a = self._compute_hard_stop_pts(self.sl_pts)
+                        _sl_pre = price + _sl_dist_pre_a if direction == "SHORT" else price - _sl_dist_pre_a
                 else:
-                    _sl_pre = price + self.sl_pts if direction == "SHORT" else price - self.sl_pts
+                    # W4.4: hard_stop_dynamic opt-in
+                    _sl_dist_pre_b = self._compute_hard_stop_pts(self.sl_pts)
+                    _sl_pre = price + _sl_dist_pre_b if direction == "SHORT" else price - _sl_dist_pre_b
                 _tp1_pre = price - _tp1_pts_pre if direction == "SHORT" else price + _tp1_pts_pre
                 _tp2_pre = price - _tp2_pts_pre if direction == "SHORT" else price + _tp2_pts_pre
             else:
-                _sl_pre = price + self.sl_pts if direction == "SHORT" else price - self.sl_pts
+                # W4.4: hard_stop_dynamic opt-in
+                _sl_dist_pre_c = self._compute_hard_stop_pts(self.sl_pts)
+                _sl_pre = price + _sl_dist_pre_c if direction == "SHORT" else price - _sl_dist_pre_c
                 _tp1_pre = price - self.tp1_pts if direction == "SHORT" else price + self.tp1_pts
                 _tp2_pre = price - self.tp2_pts if direction == "SHORT" else price + self.tp2_pts
             try:
@@ -2856,16 +3051,29 @@ class EventProcessor:
             _tp1_pts = _atr * _tp1_mult
             _tp2_pts = _atr * _tp2_mult
             # SL: behind displacement bar or default
+            # 2026-05-07 fix: require disp_lo < price (LONG) or disp_hi > price (SHORT).
+            # Without this guard, when price retraces past the displacement bar, SL lands
+            # on the WRONG side of entry (e.g. LONG with SL above entry). Fall back to
+            # default sl_pts in that case and warn so the divergence is visible.
             if _stop_mode == "displacement_bar":
                 _, _, _disp_lo, _disp_hi = self._detect_trend_displacement(direction)
-                if direction == "LONG" and _disp_lo > 0:
+                if direction == "LONG" and 0 < _disp_lo < price:
                     sl = _disp_lo - 1.0  # 1pt buffer below displacement low
-                elif direction == "SHORT" and _disp_hi > 0:
+                elif direction == "SHORT" and _disp_hi > price:
                     sl = _disp_hi + 1.0  # 1pt buffer above displacement high
                 else:
-                    sl = price + self.sl_pts if direction == "SHORT" else price - self.sl_pts
+                    if (direction == "LONG" and _disp_lo >= price) or (direction == "SHORT" and 0 < _disp_hi <= price):
+                        log.warning(
+                            "DISPLACEMENT_SL_FALLBACK: %s entry=%.2f disp_lo=%.2f disp_hi=%.2f -> default SL (price retraced past displacement)",
+                            direction, price, _disp_lo, _disp_hi,
+                        )
+                    # W4.4: hard_stop_dynamic opt-in fallback
+                    _sl_dist_live = self._compute_hard_stop_pts(self.sl_pts)
+                    sl = price + _sl_dist_live if direction == "SHORT" else price - _sl_dist_live
             else:
-                sl = price + self.sl_pts if direction == "SHORT" else price - self.sl_pts
+                # W4.4: hard_stop_dynamic opt-in fallback
+                _sl_dist_live = self._compute_hard_stop_pts(self.sl_pts)
+                sl = price + _sl_dist_live if direction == "SHORT" else price - _sl_dist_live
             tp1 = price - _tp1_pts if direction == "SHORT" else price + _tp1_pts
             tp2 = price - _tp2_pts if direction == "SHORT" else price + _tp2_pts
             log.info("[CONTINUATION_TARGETS] sl=%.2f tp1=%.2f tp2=%.2f atr=%.1f mode=%s",
@@ -2874,6 +3082,28 @@ class EventProcessor:
             sl   = price + self.sl_pts   if direction == "SHORT" else price - self.sl_pts
             tp1  = price - self.tp1_pts  if direction == "SHORT" else price + self.tp1_pts
             tp2  = price - self.tp2_pts  if direction == "SHORT" else price + self.tp2_pts
+
+        # --- W2.2 (2026-05-09) Universal RR>=1.0 gate ---
+        # Per TECH_M30_Framework R5: entry only when RR >= 1.0. Was previously
+        # enforced only in GAMMA (line 4067) and DELTA (line 4364) paths. ALPHA /
+        # RANGE_BOUND / PULLBACK / CONTINUATION / OVEREXTENSION had no check.
+        # Compute RR = TP1_dist / SL_dist; reject if below threshold.
+        try:
+            _rr_min = float(self._thresholds.get("min_rr_universal", 1.0))
+            _rr_enabled = bool(self._thresholds.get("min_rr_universal_enabled", True))
+            _sl_dist = abs(price - sl)
+            _tp1_dist = abs(tp1 - price)
+            _rr = (_tp1_dist / _sl_dist) if _sl_dist > 1e-6 else 0.0
+            if _rr_enabled and _rr < _rr_min:
+                log.warning(
+                    "RR_BLOCK: RR=%.2f < %.2f (price=%.2f sl=%.2f tp1=%.2f mode=%s) — entry rejected",
+                    _rr, _rr_min, price, sl, tp1, strategy_reason,
+                )
+                print(f"[{ts}] [RR_BLOCK] {direction} RR={_rr:.2f} < {_rr_min:.2f} — entry rejected ({strategy_reason})")
+                return
+        except Exception as _rr_e:
+            log.debug("RR check error (allowing entry): %s", _rr_e)
+
         _dyn_lots = self._compute_session_lots(
             ice_aligned=decision.iceberg.aligned if decision.iceberg.detected else False,
         )
@@ -3029,6 +3259,13 @@ class EventProcessor:
                 print(f"[{ts}] EXEC_FAILED: GO {direction} — NO BROKER CONNECTED")
                 # Separate execution failure message (Fase 2 Telegram Decoupling)
                 tg.notify_execution()
+
+                # W1.3 fix 2026-05-09: enforce cooldown even on EXEC_FAILED.
+                # Without this, brokers-disconnected scenarios bypass same-level cooldown
+                # producing 10+ identical signals in 30s (observed 2026-05-08 15:56-15:58).
+                self._last_trade_time = time.monotonic()
+                self._last_trade_level = price
+                self._last_trade_direction = direction
 
     # ------------------------------------------------------------------
     # Expansion lines helper (BUG 2 support)
@@ -3417,6 +3654,28 @@ class EventProcessor:
                 disp_valid=False, disp_reason=disp_reason)
             return ("SKIP", None, f"no displacement: {disp_reason}")
 
+        # W2.4 (2026-05-09) — orientation gate. The displacement bar must still be
+        # ON THE CORRECT SIDE of current price for the trade premise to hold.
+        # If price has retraced past the displacement bar (disp_low >= price for
+        # LONG; disp_high <= price for SHORT), the displacement is no longer
+        # "active" and SL placement is impossible per Sprint 9 spec. Previously
+        # event_processor.py:2860 fell back to default sl_pts SL but still emitted
+        # the entry (BUG-SL-DISPLACEMENT residual). Now: reject the signal.
+        if direction == "LONG" and disp_low > 0 and disp_low >= price:
+            _msg = (f"displacement_inactive: LONG disp_low={disp_low:.2f} >= price={price:.2f} "
+                    f"(price retraced past displacement bar)")
+            self._log_continuation_attempt(
+                direction, phase, price, "SKIP", _msg,
+                disp_valid=True, disp_reason=disp_reason)
+            return ("SKIP", None, _msg)
+        if direction == "SHORT" and disp_high > 0 and disp_high <= price:
+            _msg = (f"displacement_inactive: SHORT disp_high={disp_high:.2f} <= price={price:.2f} "
+                    f"(price retraced past displacement bar)")
+            self._log_continuation_attempt(
+                direction, phase, price, "SKIP", _msg,
+                disp_valid=True, disp_reason=disp_reason)
+            return ("SKIP", None, _msg)
+
         # 2b. Exhaustion check
         exhausted, exh_reason = self._detect_local_exhaustion(direction, decision)
         if exhausted:
@@ -3754,7 +4013,14 @@ class EventProcessor:
             # mean-reversion (e.g. SHORT@liq_top during bullish rally) but
             # allow aligned mean-reversion (e.g. SHORT@liq_top in bearish range)
             # and preserve true Strategy 1 when resolved=unknown.
-            if self._thresholds.get("range_bound_bias_filter_enabled", True):
+            # W2.6 (2026-05-09): F-asym is always-on in prod. The flag
+            # range_bound_bias_filter_enabled in settings.json is now ADVISORY
+            # ONLY (kept for tooling that may inspect intent). If anyone disables
+            # it via settings, we log a warning and ignore.
+            if not self._thresholds.get("range_bound_bias_filter_enabled", True):
+                log.warning("F_ASYM_FLAG_DISABLED_IGNORED: range_bound_bias_filter_enabled=false in settings,"
+                            " but W2.6 mandates always-on; proceeding with filter active.")
+            if True:  # W2.6 (2026-05-09): F-asym always-on; range_bound_bias_filter_enabled flag is advisory only
                 _resolved_trend, _bias_src, _bias_conf = self._resolve_trend_direction()
                 if _resolved_trend == "long" and direction == "SHORT":
                     log.info("[RANGE_BIAS_BLOCK] counter-bull SHORT skipped "
@@ -3805,7 +4071,7 @@ class EventProcessor:
                         # overextension reversal fires SHORT counter to a confirmed
                         # bullish bias. Block when the cascade resolves a bullish
                         # trend so we don't trade against the dominant move.
-                        if self._thresholds.get("range_bound_bias_filter_enabled", True):
+                        if True:  # W2.6 (2026-05-09): F-asym always-on; range_bound_bias_filter_enabled flag is advisory only
                             _resolved_trend, _bias_src, _bias_conf = self._resolve_trend_direction()
                             if _resolved_trend == "long":
                                 log.info("[TRENDING_BIAS_BLOCK] counter-bull SHORT skipped "
@@ -3827,7 +4093,7 @@ class EventProcessor:
                         # F-asymmetric extension (ML-DS 1214598376829822): block
                         # counter-bear LONG on overextension reversal when cascade
                         # resolves bearish.
-                        if self._thresholds.get("range_bound_bias_filter_enabled", True):
+                        if True:  # W2.6 (2026-05-09): F-asym always-on; range_bound_bias_filter_enabled flag is advisory only
                             _resolved_trend, _bias_src, _bias_conf = self._resolve_trend_direction()
                             if _resolved_trend == "short":
                                 log.info("[TRENDING_BIAS_BLOCK] counter-bear LONG skipped "
@@ -4551,6 +4817,34 @@ class EventProcessor:
 
         if prob < 0.50 or refills < 3:
             return
+
+        # W1.3 dedup 2026-05-09: prevent watchdog reprocessing duplicates.
+        # On 2026-05-08 15:56-15:58 a single iceberg JSONL line produced 10+
+        # GO signals @ MT5 4685.75. Hash on (rounded ts, price, side, refills);
+        # suppress identical events within 30s window.
+        try:
+            _ev_ts = event.get("ts") or event.get("timestamp") or ""
+            _ev_id = event.get("event_id") or event.get("id")
+            if _ev_id is not None:
+                _hash_key = ("id", str(_ev_id))
+            else:
+                _hash_key = ("digest", str(_ev_ts)[:19], round(gc_price, 1), side, refills)
+            _now_mono = time.monotonic()
+            if not hasattr(self, "_iceberg_dedup_cache"):
+                self._iceberg_dedup_cache = {}
+            _last_seen = self._iceberg_dedup_cache.get(_hash_key)
+            if _last_seen is not None and (_now_mono - _last_seen) < 30.0:
+                log.debug("ICEBERG_DEDUP suppressed: key=%s elapsed=%.1fs", _hash_key, _now_mono - _last_seen)
+                return
+            self._iceberg_dedup_cache[_hash_key] = _now_mono
+            # Bound cache size: drop entries older than 5 min
+            if len(self._iceberg_dedup_cache) > 1000:
+                _cutoff = _now_mono - 300.0
+                self._iceberg_dedup_cache = {
+                    k: v for k, v in self._iceberg_dedup_cache.items() if v > _cutoff
+                }
+        except Exception as _dedup_e:
+            log.debug("iceberg dedup check error (proceeding): %s", _dedup_e)
 
         # Convert GC price -> MT5 XAUUSD price
         offset    = self._gc_xauusd_offset

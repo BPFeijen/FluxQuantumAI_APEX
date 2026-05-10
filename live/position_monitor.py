@@ -424,7 +424,12 @@ class PositionMonitor:
         DECISIONS_LOG.parent.mkdir(parents=True, exist_ok=True)
         self._dec_log_fh = open(DECISIONS_LOG, "a", encoding="utf-8", buffering=1)
         POSITION_EVENTS_LOG.parent.mkdir(parents=True, exist_ok=True)
-        self._canonical_lock = threading.Lock()
+        # W3.1 (2026-05-09): write logic centralized in live.decision_writer.
+        # _canonical_lock is kept as a backwards-compat attribute (in case
+        # external tests/scripts reference it) but is no longer used internally;
+        # all writes go through write_decision_atomic which acquires the lock.
+        from live.decision_writer import WRITE_LOCK as _shared_decision_lock
+        self._canonical_lock = _shared_decision_lock
 
         # P1-POS-LOG (EXEC-3 2026-04-26): startup heartbeat — proves both
         # streams are open & writable at boot, creates POSITION_EVENTS_LOG
@@ -725,8 +730,94 @@ class PositionMonitor:
                         "strategy_mode": trade_rec.get("strategy_mode", "") if trade_rec else "",
                         # Pullback end tracking
                         "pullback_end_streak": 0,
+                        # W4.1 (2026-05-09) MFE/MAE tracking + Giveback shadow logging.
+                        # FIT_GAP P1 (April 9). Tracks Maximum Favorable/Adverse
+                        # Excursion in points across full position lifetime.
+                        # Replaces point-in-time mfe/mae snapshot at line 908-909.
+                        "mfe_pts":            0.0,
+                        "mae_pts":            0.0,
+                        "mfe_at_mono":        now_mono,
+                        "giveback_logged":    False,  # one-shot per position
                     }
                 state = self._state[ticket]
+
+            # --- W4.1 MFE/MAE update (every tick) ---
+            if price is not None and entry is not None:
+                _sign = 1 if direction == "LONG" else -1
+                _pnl_pts = (price - entry) * _sign
+                if _pnl_pts > state.get("mfe_pts", 0.0):
+                    state["mfe_pts"]     = _pnl_pts
+                    state["mfe_at_mono"] = now_mono
+                if _pnl_pts < -state.get("mae_pts", 0.0):
+                    state["mae_pts"] = -_pnl_pts
+                # W5.3 (2026-05-09) Giveback rule ARMED — Telegram alert only.
+                # Was W4.1 SHADOW (log only). Per Barbara directive 2026-05-09
+                # "shadow é o que está faltando". Conservative first step:
+                # alert via Telegram, NO automatic close. Calibrate before
+                # arming as sl_tighten / close (see settings.giveback_action).
+                thr_pm = self._thresholds if hasattr(self, "_thresholds") else {}
+                _giveback_pct  = float(thr_pm.get("giveback_retracement_pct", 0.50))
+                _mfe_min_atr   = float(thr_pm.get("giveback_mfe_min_atr", 0.5))
+                _giveback_act  = str(thr_pm.get("giveback_action", "alert")).lower()
+                _giveback_armed = bool(thr_pm.get("giveback_armed", True))
+                if (
+                    _giveback_armed
+                    and not state.get("giveback_logged", False)
+                    and state.get("mfe_pts", 0.0) > atr * _mfe_min_atr
+                    and _pnl_pts < state["mfe_pts"] * (1.0 - _giveback_pct)
+                ):
+                    _actual_retrace = 1.0 - (_pnl_pts / state["mfe_pts"]) if state["mfe_pts"] != 0 else 0.0
+                    log.warning(
+                        "GIVEBACK_FIRED ticket=%s dir=%s mfe=%.1f current=%.1f retrace=%.0f%% action=%s",
+                        ticket, direction, state["mfe_pts"], _pnl_pts, _actual_retrace * 100, _giveback_act,
+                    )
+                    try:
+                        from live import telegram_notifier as _tg_gb
+                        _tg_gb.notify_giveback(
+                            direction=direction,
+                            ticket=int(ticket) if ticket else 0,
+                            mfe_pts=float(state["mfe_pts"]),
+                            current_pnl_pts=float(_pnl_pts),
+                            giveback_pct=float(_actual_retrace),
+                            action=_giveback_act,
+                        )
+                    except Exception as _gbe:
+                        log.warning("notify_giveback failed (alert lost): %s", _gbe)
+                    state["giveback_logged"] = True
+                    # W5.3-ARMED 2026-05-09 (per backtest validation thisweek):
+                    # action="close" empirically saves -$11.9k → +$2.2k swing on
+                    # 2026-05-04..05-08 production decision_log replay.
+                    # Close behavior mirrors L2_DANGER (line 1200-1209):
+                    #   - shield_done=True → close leg2/leg3 only (leg1 already TP1'd)
+                    #   - shield_done=False → close all legs of trade group
+                    if _giveback_act == "close":
+                        try:
+                            ts_now = _ts()
+                            shield_done = bool(state.get("shield_done", False))
+                            if trade_rec is None:
+                                self._close_ticket(pos["ticket"], "GIVEBACK_CLOSE", ts_now)
+                            else:
+                                if shield_done:
+                                    # Only leg2 + leg3 still open (leg1 closed at TP1)
+                                    leg2_t = int(trade_rec.get("leg2_ticket", 0) or 0)
+                                    leg3_t = int(trade_rec.get("leg3_ticket", 0) or 0)
+                                    for tkt in (leg2_t, leg3_t):
+                                        if tkt > 0:
+                                            self._close_ticket(tkt, "GIVEBACK_CLOSE", ts_now)
+                                else:
+                                    leg1_t = int(trade_rec.get("leg1_ticket", 0) or 0)
+                                    leg2_t = int(trade_rec.get("leg2_ticket", 0) or 0)
+                                    leg3_t = int(trade_rec.get("leg3_ticket", 0) or 0)
+                                    for tkt in (leg1_t, leg2_t, leg3_t):
+                                        if tkt > 0:
+                                            self._close_ticket(tkt, "GIVEBACK_CLOSE", ts_now)
+                            log.warning("GIVEBACK_CLOSE_EXECUTED ticket=%s dir=%s mfe=%.1f retrace=%.0f%%",
+                                        ticket, direction, state["mfe_pts"], _actual_retrace * 100)
+                        except Exception as _gbc:
+                            log.error("GIVEBACK_CLOSE failed (position not closed!): %s", _gbc)
+                    elif _giveback_act == "sl_tighten":
+                        # Reserved for future arming step (currently unimplemented)
+                        log.info("GIVEBACK_SL_TIGHTEN requested but not yet implemented; treating as alert-only")
 
             # Update price history for cascade check
             self._update_price_history(ticket, now_ts, price)
@@ -900,8 +991,11 @@ class PositionMonitor:
             "direction":       direction,
             "entry_price":     entry,
             "pnl":             pnl_pts,
-            "mfe":             max(pnl_pts, 0.0),   # live MFE not tracked here
-            "mae":             max(-pnl_pts, 0.0),
+            # W4.1 (2026-05-09): true MFE/MAE tracked across position lifetime
+            # (was point-in-time snapshot). Falls back to point-in-time if state
+            # not yet initialized.
+            "mfe":             max(state.get("mfe_pts", pnl_pts), 0.0),
+            "mae":             max(state.get("mae_pts", -pnl_pts), 0.0),
             "shield_active":   state.get("shield_done", False),
             "legs_open":       legs_open,
             "hedge_active":    state.get("hedge_active", False),
@@ -1328,13 +1422,29 @@ class PositionMonitor:
         m30_bot    = round(m30_bot_gc - offset, 2) if m30_bot_gc else None
         m30_fmv    = round(m30_fmv_gc - offset, 2) if m30_fmv_gc else None
 
+        # W2.3 (2026-05-09) FMV fallback removal per TECH_M30_Framework R2
+        # ("FMV = exact midpoint of confirmed box ALWAYS"). Was previously falling
+        # back to mt5_px + atr*0.7, violating spec. New policy:
+        #   1. Use m30_fmv if available
+        #   2. Else compute true box midpoint (m30_top + m30_bot) / 2
+        #   3. Else REJECT the flip operation (no spec-compliant TP1 possible)
+        if m30_fmv is None and m30_top is not None and m30_bot is not None:
+            m30_fmv = round((m30_top + m30_bot) / 2.0, 2)
+            log.info("OFFENSIVE_FLIP: m30_fmv None, computed midpoint=%.2f from box [%.2f,%.2f]",
+                     m30_fmv, m30_bot, m30_top)
+        if m30_fmv is None:
+            log.warning("OFFENSIVE_FLIP REJECTED: m30_fmv unavailable and box midpoint not computable "
+                        "(top=%s bot=%s) — TP1 spec compliance impossible, skipping flip",
+                        m30_top, m30_bot)
+            return
+
         # FVG detection from M30 OHLC bars
         fvg = _compute_fvg_m30(m30_snap.get("bars"), flip_dir)
 
         # SL / TP / Limit level computation (all in XAUUSD MT5 space)
         if flip_dir == "LONG":
             sl    = round(mt5_px - atr * 1.5, 2)
-            tp1   = round(m30_fmv or (mt5_px + atr * 0.7), 2)
+            tp1   = m30_fmv  # W2.3: spec mandates FMV; no atr-offset fallback
             tp2   = round(m30_top or (mt5_px + atr * 2.0), 2)
 
             # Limit entries BELOW current price (retest on pullback)
@@ -1353,7 +1463,7 @@ class PositionMonitor:
 
         else:  # flip_dir == "SHORT"
             sl    = round(mt5_px + atr * 1.5, 2)
-            tp1   = round(m30_fmv or (mt5_px - atr * 0.7), 2)
+            tp1   = m30_fmv  # W2.3: spec mandates FMV; no atr-offset fallback
             tp2   = round(m30_bot or (mt5_px - atr * 2.0), 2)
 
             # Limit entries ABOVE current price (retest on pullback up)
@@ -2252,14 +2362,9 @@ class PositionMonitor:
             "decision_id": str(uuid.uuid4())[:8],
         }
         try:
-            DECISION_LIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with self._canonical_lock:
-                tmp = DECISION_LIVE_PATH.with_suffix(".tmp")
-                with open(tmp, "w", encoding="utf-8") as f:
-                    json.dump(decision_payload, f, indent=2, default=str)
-                tmp.replace(DECISION_LIVE_PATH)
-                with open(DECISION_LOG_PATH, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(decision_payload, default=str) + "\n")
+            # W3.1 (2026-05-09): centralized atomic write via live.decision_writer
+            from live.decision_writer import write_decision_atomic
+            write_decision_atomic(decision_payload)
 
             # === Fase 2: notify Telegram after canonical write succeeds ===
             # All PM events (SHIELD, REGIME_FLIP, TP1_HIT, SL_HIT, etc.)
