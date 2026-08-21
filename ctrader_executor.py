@@ -100,6 +100,9 @@ try:
         ProtoOATraderReq,
         ProtoOAAmendPositionSLTPReq,
     )
+    from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import (  # type: ignore
+        ProtoHeartbeatEvent,  # required to keep cTrader connection alive (~25s)
+    )
     from ctrader_open_api.messages.OpenApiModelMessages_pb2 import (  # type: ignore
         ProtoOAOrderType,
         ProtoOATradeSide,
@@ -292,6 +295,12 @@ class CTraderExecutor:
             def _on_disconnected(_client, reason) -> None:
                 self.connected = False
                 log.warning("cTrader disconnected: %s", reason)
+                # Trigger auto-reconnect on next reconnect() call. The event
+                # processor's open_position() path checks self.connected and
+                # invokes reconnect() if False; without this callback flag,
+                # reconnect was being skipped because some internal state
+                # still thought we were connected. Clearing here ensures the
+                # next caller does a fresh handshake.
 
             self._client = Client(self._host, self._port, TcpProtocol)
             self._client.setConnectedCallback(_on_connected)
@@ -339,6 +348,43 @@ class CTraderExecutor:
                 "cTrader %s account %d CONNECTED — %d symbols cached, %d open positions",
                 self._mode.upper(), self._account_id, len(self._symbols), len(self._positions_cache),
             )
+            # 2026-05-11: outgoing heartbeat removed. ProtoHeartbeatEvent
+            # is fire-and-forget but client.send() creates a Deferred that
+            # times out and triggers a disconnect cycle.
+
+            # ---- Reconnect watchdog thread ----
+            # cTrader server idle-disconnects clean after ~30-60s of inactivity.
+            # _on_disconnected callback sets self.connected=False; this watchdog
+            # detects the drop and triggers reconnect, so we don't have to wait
+            # for the next GO signal to attempt reconnect.
+            if not hasattr(self, "_watchdog_thread") or self._watchdog_thread is None or not self._watchdog_thread.is_alive():
+                self._watchdog_stop = threading.Event()
+
+                def _watchdog_loop():
+                    while not self._watchdog_stop.is_set():
+                        self._watchdog_stop.wait(timeout=10.0)
+                        if self._watchdog_stop.is_set():
+                            break
+                        if not self.connected:
+                            try:
+                                # Tear down old client (best-effort) and
+                                # call reconnect() which rebuilds state.
+                                if self._client is not None:
+                                    try:
+                                        self._reactor.callFromThread(self._client.stopService)
+                                    except Exception:
+                                        pass
+                                    self._client = None
+                                log.info("cTrader watchdog: detected disconnect, reconnecting...")
+                                self.reconnect()
+                            except Exception as e:
+                                log.warning("cTrader watchdog reconnect error: %s", e)
+
+                self._watchdog_thread = threading.Thread(
+                    target=_watchdog_loop, name="ctrader_watchdog", daemon=True,
+                )
+                self._watchdog_thread.start()
+                log.info("cTrader reconnect watchdog started (10s interval)")
             return True
         except Exception as e:
             self.connected = False

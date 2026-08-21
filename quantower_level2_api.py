@@ -35,7 +35,9 @@ BUFFER_SIZE = int(os.getenv("LEVEL2_BUFFER_SIZE", "500"))  # flush a cada N regi
 FLUSH_INTERVAL_SECONDS = float(os.getenv("LEVEL2_FLUSH_INTERVAL", "2.0"))  # flush mais frequente
 USE_COMPRESSION = os.getenv("LEVEL2_USE_COMPRESSION", "true").lower() == "true"  # gzip por padr�o
 API_PORT = int(os.getenv("LEVEL2_API_PORT", "8000"))
-API_HOST = os.getenv("LEVEL2_API_HOST", "0.0.0.0")
+API_HOST = os.getenv("LEVEL2_API_HOST", "127.0.0.1")   # Bcap #3: same-host bridge → no 0.0.0.0 network exposure
+CORS_ORIGINS = [o for o in os.getenv("LEVEL2_CORS_ORIGINS", "http://127.0.0.1").split(",") if o]  # Bcap #3
+GAP_MARKER_FILE = os.path.join(DATA_DIR, "capture_gaps.csv")  # Bcap #2a: durable reconnect/gap marker (symbol-independent)
 
 # S�mbolos permitidos (seguran�a) - aceita qualquer s�mbolo por padr�o
 ALLOWED_SYMBOLS = None  # Aceita todos os s�mbolos
@@ -101,6 +103,13 @@ class CSVBufferManager:
             if write_header and header:
                 writer.writerow(header)
             writer.writerows(rows)
+            # Bcap #4: durabilidade — garante que o flush 2s/500-linhas chega ao DISCO
+            # (não só ao page-cache). gzip.flush() esvazia o buffer do gzip; fsync força o fd.
+            try:
+                f.flush()
+                os.fsync(f.fileno())          # GzipFile.fileno() delega ao fd subjacente
+            except (OSError, ValueError) as _e:
+                logger.error(f"fsync falhou em {actual_path}: {_e}")
 
         self._stats["rows_written"] += len(rows)
         self._stats["flushes"] += 1
@@ -146,6 +155,7 @@ async def periodic_flush():
 async def lifespan(app: FastAPI):
     """Gerencia lifecycle do app - inicia/para background tasks."""
     task = asyncio.create_task(periodic_flush())
+    _write_durable_gap_marker(reason="lifespan_startup", ts=datetime.now(timezone.utc))  # Bcap #2a
     logger.info("Level2 API started - periodic flush enabled")
     yield
     task.cancel()
@@ -163,7 +173,7 @@ app = FastAPI(
 # CORS para permitir requests do Quantower (se necess�rio)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,                # Bcap #3: restrito (default http://127.0.0.1) — era ["*"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -296,6 +306,24 @@ def get_file_path(symbol: str, data_type: str, date: str) -> str:
     for char in [':', '/', '\\', '*', '?', '"', '<', '>', '|', ' ']:
         symbol_clean = symbol_clean.replace(char, '_')
     return os.path.join(DATA_DIR, symbol_clean, f"{data_type}_{date}.csv")
+
+
+def _write_durable_gap_marker(reason: str, ts: datetime) -> None:
+    """Bcap #2a: append durável (flush+fsync) de um marcador de gap, INDEPENDENTE do
+    CSVBufferManager (que se perde num kill da API). Arquivo fixo, sem depender do símbolo,
+    consumível pelo D0/exclude-manifest para detectar reconnects no próprio stream."""
+    try:
+        os.makedirs(os.path.dirname(GAP_MARKER_FILE) or ".", exist_ok=True)
+        write_header = not os.path.exists(GAP_MARKER_FILE)
+        with open(GAP_MARKER_FILE, "a", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            if write_header:
+                w.writerow(["recv_timestamp", "source", "reason", "gap_start", "gap_end", "detail"])
+            w.writerow([ts.isoformat(), "api_start", reason, "", ts.isoformat(), ""])
+            f.flush()
+            os.fsync(f.fileno())
+    except Exception as e:
+        logger.error(f"durable gap-marker falhou (não-fatal): {e}")
 
 
 def validate_symbol(symbol: str) -> bool:

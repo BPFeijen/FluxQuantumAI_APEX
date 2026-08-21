@@ -1,0 +1,221 @@
+RELATORIO — Proveniencia + Inventario + Upload dados ICEBERG (Contabo)
+Gerado por: Claude Code (sessao interativa com Barbara Feijen)
+Data de geracao: 2026-08-21 (madrugada, sessao iniciada 2026-08-20)
+Maquina: host local FluxQuantumAI/TradeATS (Windows Server 2019)
+Regra observada: G-NEVER-RESTART-CAPTURE — nenhum processo/servico foi iniciado, parado ou reconfigurado.
+NOTA DE DESVIO DE ESCOPO: a Parte 3 do prompt original pedia upload ad-hoc para pasta nova
+"iceberg_contabo_data/". Isto foi barrado por uma regra ja existente de Barbara (2026-07-24):
+Storage Box e EXCLUSIVA para o backup automatico sancionado, sem outros usos sem GO explicito.
+Barbara deu GO pontual, em chat, para uma acao mais restrita: "faca upload apenas dos arquivos
+iceberg faltantes" + "verifique se os dados existentes no hetzner vao ate 31.07.2026". Toda a
+Parte 3 abaixo reflete essa autorizacao explicita, nao o texto literal do documento original.
+
+================================================================================
+SS1 — PROCESSO VIVO (PID / uptime / cmdline / paths / MD5s)
+================================================================================
+
+1.1 Estado do processo na porta 8002 (momento da verificacao: 2026-08-20 ~23:44 local)
+    - Nenhum listener ativo na porta 8002 (Get-NetTCPConnection: nenhum resultado).
+    - Nenhum processo python.exe/pythonw.exe em execucao na maquina.
+    - Nenhum processo com "iceberg"/"uvicorn"/"8002" na linha de comando.
+    => NAO HA PID/uptime a reportar: o receiver NAO esta em execucao neste momento.
+
+1.2 Servico Windows associado (via registo, read-only — NUNCA iniciado/parado por esta auditoria)
+    Nome:        TradeATSIcebergReceiver
+    DisplayName: "TradeATS Iceberg Receiver (FastAPI :8002)"
+    State:       Stopped
+    StartMode:   Disabled  (nao arranca nem no proximo boot)
+    Gestor:      NSSM (C:\tools\nssm\nssm.exe), conta LocalSystem
+    Application (registo Parameters):
+        C:\TradeATS\services\iceberg_receiver\venv\Scripts\python.exe
+    AppParameters:
+        -m uvicorn iceberg_receiver.main:app --host 127.0.0.1 --port 8002
+    AppDirectory:
+        C:\TradeATS_worktrees\release-575b10a\services\iceberg_receiver
+
+    Servico irmao (contexto, porta 8001, tambem Stopped/Disabled):
+    TradeATSReceiver -> C:\TradeATS\receiver\venv\Scripts\python.exe
+                         -m uvicorn receiver:app --host 127.0.0.1 --port 8001
+                         AppDirectory C:\TradeATS\receiver
+
+1.3 ANOMALIA CENTRAL — o software configurado no servico NAO E o ficheiro ja copiado para si
+    O ficheiro que ja lhe foi copiado (iceberg_receiver.py, standalone, ~58 linhas FastAPI simples)
+    NAO corresponde ao que o servico Windows esta configurado para executar. Sao dois softwares
+    diferentes com o mesmo proposito/porta:
+
+    a) Copia(s) do standalone iceberg_receiver.py (a que ja lhe foi entregue):
+       - C:\FluxQuantumAI\iceberg_receiver.py
+       - C:\FluxQuantumAI\Backups\pre-deploy-20260417_141337\iceberg_receiver.py
+       - C:\FluxQuantumAI\Lixo\deploy-staging-20260417_164202\iceberg_receiver.py
+       Tamanho: 1567 bytes (58 linhas) | MD5 (as 3 copias, identico):
+       FBEA387B42D1FB7AD02F4B2E29E6BD20
+       => IGUAL ao hash de referencia do prompt (fbea387b42d1fb7ad02f4b2e29e6bd20). CONFIRMADO.
+       Escreve para DATA_DIR = "C:/data/iceberg" (hardcoded no proprio ficheiro).
+
+    b) Codigo real apontado pelo servico Windows (pacote iceberg_receiver/main.py, com testes):
+       b1) Versao no worktree que o servico usa (AppDirectory acima):
+           C:\TradeATS_worktrees\release-575b10a\services\iceberg_receiver\iceberg_receiver\main.py
+           Tamanho: 12790 bytes | mtime: 2026-07-16 11:20:45
+           MD5: 0E0A1AD3491F3DF1908D13A62BEC2C23
+           Git: worktree em commit 575b10ab2537b98016abc6a8f4959a7f98c1430e (branch release),
+                sem alteracoes locais (git status/diff vazios) — o ficheiro bate certo com o commit.
+           Ultimo commit que tocou o ficheiro: 2080ac988b99111b44ddf60d86c82f220d9bdf62 (2026-05-29).
+
+       b2) Versao no repo canonico (fora do worktree):
+           C:\TradeATS\services\iceberg_receiver\iceberg_receiver\main.py
+           Tamanho: 12459 bytes | mtime: 2026-05-25 17:04:01
+           MD5: 2F81D2C7A4366F3748E33A31C4787DAB
+           (diferente de b1 — o worktree tem uma revisao mais recente que o repo "canonico" local)
+
+    => NENHUM dos MD5 de (b) bate com fbea387b42d1fb7ad02f4b2e29e6bd20. Nao e o mesmo software,
+       apenas partilha nome/porta. NAO CORRIGI nada — apenas reporto, conforme instruido.
+
+1.4 Ficheiro .cs (FluxQuantumAI_Iceberg_Orders_Detector.cs) — proveniencia CONFIRMADA
+    a) C:\Users\Administrator\Documents\FluxQuantumAI_Iceberg_Orders_Detector.cs
+       (copia entregue a "owner", mtime 2026-08-20 23:18:43 — copiada durante esta sessao)
+    b) C:\Users\Administrator\source\repos\FluxQuantumAI_Iceberg Orders Detector\
+       FluxQuantumAI_Iceberg_Orders_Detector.cs  (fonte original, mtime 2026-01-03 20:46:01)
+    Tamanho (ambas): 19620 bytes
+    MD5 (ambas, identico): 040994EB635AD464BDE19A9ABE7755F7
+    => IGUAL ao hash de referencia do prompt (040994eb635ad464bde19a9abe7755f7). CONFIRMADO.
+
+================================================================================
+SS2 — INVENTARIO DOS DADOS (read-only)
+================================================================================
+
+ANOMALIA DE PATH: o prompt original assume DATA_DIR = C:/data/iceberg como "o vivo". Isso e
+verdade apenas para o standalone (1.3.a), que NAO e o que o servico Windows executa. O comentario
+dentro do proprio script de backup sancionado (C:\TradeATS\scripts\daily_rclone_backup.ps1)
+confirma isto por escrito:
+  "Iceberg canonical live capture (post-2026-07-12 cutover, iceberg_receiver.py writes here now)"
+  referindo-se a C:\TradeATS\data\iceberg como o diretorio vivo POS-cutover, e chamando
+  C:\data\iceberg de "legacy ... all symbols pre-cutover — do NOT merge".
+Duas pastas de dados foram portanto inventariadas:
+
+2.1 C:\data\iceberg — LEGACY (pre-cutover 2026-07-12)
+    Ficheiros iceberg_*.jsonl: 873  (ver nota de anomalia 2.3 abaixo)
+    Bytes totais: 6.632.387.354 (~6,18 GiB)
+    Cobertura por nome de ficheiro: 2025-07-01 .. 2026-07-11 (formato "iceberg__SIMBOLO_BOLSA_DATA")
+      + 112 ficheiros no formato novo "iceberg_SIMBOLO_BOLSA_DATA" (2026-07-12 a 2026-08-02) —
+      ver 2.3.
+    Detalhe completo (nome · bytes · mtime · nº linhas) por ficheiro:
+      C:\FluxQuantumAI\_audit\contabo_iceberg_2026-08-20\inventory.csv
+
+2.2 C:\TradeATS\data\iceberg — CANONICO / VIVO (fonte real do servico Windows, pos-cutover)
+    Ficheiros: 310
+    Bytes totais: 2.585.150.621 (~2,41 GiB)
+    Cobertura por nome de ficheiro: 2025-07-01 .. 2026-08-02
+    Datas distintas com pelo menos 1 ficheiro: 221 (de um total de ~397 dias corridos no
+      intervalo 2025-07-01..2026-08-02) — diferenca esperada em grande parte por fins-de-semana
+      e feriados (mercados futuros fechados) e por captura esparsa no periodo inicial.
+    GAP OPERACIONAL ATUAL: ultimo ficheiro e de 2026-08-02 07:56:54. Sem NENHUM ficheiro novo
+      desde entao ate hoje (2026-08-21) = 19 dias sem captura, consistente com o servico
+      TradeATSIcebergReceiver em estado Stopped/Disabled (SS1.2). Log stderr do standalone
+      antigo tambem para em 2026-08-02, corroborando.
+    Detalhe completo (nome · bytes · mtime · nº linhas) por ficheiro:
+      C:\FluxQuantumAI\_audit\contabo_iceberg_2026-08-20\inventory_tradeats.csv
+
+2.3 ANOMALIA — C:\data\iceberg cresceu DURANTE esta sessao
+    Primeira medicao (2026-08-20 ~23:50): 762 ficheiros, todos no formato legacy antigo,
+      o mais recente com mtime 2026-07-11 19:13:45.
+    Segunda medicao (2026-08-21 ~00:05, ~15-20 min depois, apos correcao do script de
+      contagem de linhas): 873 ficheiros — os 111 adicionais no formato novo, com mtimes
+      ja carimbados entre 2026-07-12 e 2026-08-02 (ou seja, timestamps antigos preservados
+      de copia, nao gerados agora).
+    C:\data\iceberg NAO e symlink/junction (LinkType vazio, pasta real).
+    Nao foi encontrada nenhuma Scheduled Task cujo nome contenha sync/mirror/robocopy/copy
+      que explique isto. Causa NAO IDENTIFICADA — pode ser outro processo/utilizador na
+      mesma maquina a copiar C:\TradeATS\data\iceberg -> C:\data\iceberg em paralelo a
+      esta auditoria. Reportado como esta, sem correcao nem suposicao de causa.
+
+================================================================================
+SS3 — UPLOAD (Hetzner Storage Box) — ESCOPO AUTORIZADO EXPLICITAMENTE POR BARBARA
+================================================================================
+
+3.0 Decisao de escopo (registada para auditoria)
+    O prompt original pedia copiar TUDO para uma pasta nova "iceberg_contabo_data/" via
+    scp/rclone manual. Isto foi identificado como conflito direto com uma regra ja existente
+    de Barbara (memoria "feedback_hetzner_storagebox_backup_only", 2026-07-24): a Storage Box
+    e EXCLUSIVA para o backup automatico ja sancionado (daily_rclone_backup.ps1, Scheduled Task
+    "FluxDataDailyBackup", diaria 02:30, que ja cobre ambas as pastas de dados iceberg para os
+    destinos remotos ja estabelecidos hetzner_sb:data/iceberg/ e hetzner_sb:data/iceberg_tradeats/).
+    Confrontada com isto em chat, Barbara autorizou uma acao pontual mais restrita:
+      "faca upload apenas dos arquivos iceberg faltantes. Verifique se os dados iceberg
+       existentes no hetzner vao ate a data de 31.07.2026"
+    A acao abaixo usa os destinos remotos JA ESTABELECIDOS (nao a pasta nova do prompt original)
+    e faz copy --update --checksum (idempotente, nunca apaga, nunca move), exatamente como o
+    script sancionado.
+
+3.1 Estado remoto ANTES do upload (rclone lsl, read-only)
+    hetzner_sb:data/iceberg/ (bucket legacy)
+      767 entradas remotas. Cobertura ate 2026-07-11 (igual ao local legacy).
+      Comparacao remoto vs local (761 ficheiros "iceberg__*" locais): 0 EM FALTA.
+      => Bucket legacy 100% coberto. Nada foi enviado para aqui.
+
+    hetzner_sb:data/iceberg_tradeats/ (bucket canonico/vivo)
+      271 entradas remotas. Cobertura maxima ANTES do upload: 2026-07-24.
+      => RESPOSTA A PERGUNTA DE BARBARA: NAO, os dados no Hetzner NAO iam ate 31/07/2026.
+         Paravam em 24/07/2026 — 9 dias antes do que ela esperava, e 8 dias antes do
+         ultimo ficheiro local (02/08/2026).
+      Comparacao remoto vs local (310 ficheiros locais canonicos): 39 EM FALTA
+        (todos datados 2026-07-25 a 2026-08-02, todos os simbolos: 6E, BTC, GC, MES, MNQ, MYM).
+
+3.2 MD5 de cada ficheiro em falta — ANTES do upload (calculado no Contabo/local)
+    Ficheiro completo: C:\FluxQuantumAI\_audit\contabo_iceberg_2026-08-20\pre_upload_md5.txt
+    (formato: nome,md5,bytes — 39 linhas)
+
+3.3 Upload executado
+    Comando: rclone copy --update --checksum --transfers 4
+             --include-from missing_from_remote.txt (39 nomes)
+             "C:\TradeATS\data\iceberg" -> "hetzner_sb:data/iceberg_tradeats/"
+    Modo: COPY (nunca move) — originais locais intocados.
+    Dry-run previo confirmou exatamente 39/39 ficheiros, 168.900 MiB, nada extra.
+    Execucao real: 39/39 "Copied (new)", 168.900 MiB transferidos, 11.8s, exit code 0.
+    Log completo: C:\FluxQuantumAI\_audit\contabo_iceberg_2026-08-20\upload_run.log
+
+3.4 Verificacao POS-upload
+    rclone check (checksum local vs remoto) sobre os 39 ficheiros:
+      "39 matching files" / "0 differences found"
+    Nenhum ficheiro do dia corrente estava a ser escrito no momento da copia (receiver
+    parado desde 2026-08-02 — nao havia ficheiro do dia de hoje 2026-08-21 para marcar
+    como PARCIAL).
+
+    Tabela nome · MD5 local (pre-upload) · verificacao remota · OK/FALHA:
+    (39/39 = OK; ver pre_upload_md5.txt para os MD5 individuais — todos confirmados
+     identicos pelo --checksum do rclone check acima)
+
+================================================================================
+SS4 — ANOMALIAS ENCONTRADAS
+================================================================================
+
+1. [PROVENIENCIA] O servico Windows TradeATSIcebergReceiver (porta 8002) esta configurado
+   para executar um pacote Python completamente diferente (C:\TradeATS...\iceberg_receiver\
+   main.py) do ficheiro standalone ja copiado para si (iceberg_receiver.py, MD5 confirmado
+   igual a fbea387...). Sao dois softwares distintos com o mesmo nome/porta. Ver SS1.3.
+
+2. [SERVICO PARADO] TradeATSIcebergReceiver esta Stopped E StartMode=Disabled — nao vai
+   reiniciar sozinho nem no proximo boot. Sem captura desde 2026-08-02 (19 dias). Nao foi
+   tocado por esta auditoria (regra G-NEVER-RESTART-CAPTURE).
+
+3. [PATH CANONICO DIFERENTE DO ASSUMIDO] O diretorio de dados vivo real e C:\TradeATS\data\
+   iceberg, nao C:/data/iceberg como o prompt assumia. Confirmado por comentario no proprio
+   script de backup sancionado. Ver SS2.
+
+4. [CRESCIMENTO INEXPLICADO] C:\data\iceberg ganhou 111 ficheiros novos durante esta propria
+   sessao de auditoria (762 -> 873), com timestamps antigos preservados. Causa nao
+   identificada; nenhuma Scheduled Task encontrada que explique. Ver SS2.3.
+
+5. [GAP DE BACKUP] O backup automatico sancionado do bucket iceberg_tradeats estava 9 dias
+   atrasado (parava em 24/07, deveria ir ate 02/08). Corrigido nesta sessao mediante GO
+   explicito de Barbara — 39 ficheiros enviados e verificados. Bucket legacy nao tinha gaps.
+
+6. [CONFLITO DE POLITICA] O prompt original (Parte 3, pasta "iceberg_contabo_data/") conflita
+   com a regra explicita e anterior de Barbara sobre uso exclusivo da Storage Box para backup
+   sancionado. Nao foi executado como escrito no prompt; a acao real foi renegociada em chat
+   e escopada de forma mais restrita (ver SS3.0).
+
+Ficheiros de trabalho desta auditoria (todos em
+C:\FluxQuantumAI\_audit\contabo_iceberg_2026-08-20\):
+  inventory.csv, inventory_tradeats.csv, remote_iceberg_legacy.txt,
+  remote_iceberg_tradeats.txt, missing_from_remote.txt, missing_from_remote_legacy.txt,
+  pre_upload_md5.txt, upload_run.log, RELATORIO_FINAL_iceberg_contabo_2026-08-20.txt (este ficheiro)

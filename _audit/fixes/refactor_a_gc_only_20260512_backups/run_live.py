@@ -892,13 +892,15 @@ def _run_event_driven(args) -> None:
 
     # --- Initialize M30 bias immediately (don't wait for first refresh cycle) ---
     # Without this, gates have no data for the first ~15-75s after startup.
-    # Refactor A 2026-05-12: GC-only. m30_liq_top/_bot aliases equal _gc directly.
     processor.m30_bias       = levels.get("m30_bias", "unknown")
     processor.m30_liq_top_gc = levels.get("m30_liq_top")
     processor.m30_liq_bot_gc = levels.get("m30_liq_bot")
     with processor._lock:
-        processor.m30_liq_top = processor.m30_liq_top_gc
-        processor.m30_liq_bot = processor.m30_liq_bot_gc
+        _off  = processor._gc_xauusd_offset
+        _m30t = levels.get("m30_liq_top")
+        _m30b = levels.get("m30_liq_bot")
+        processor.m30_liq_top = round(_m30t - _off, 2) if _m30t is not None else None
+        processor.m30_liq_bot = round(_m30b - _off, 2) if _m30b is not None else None
     # Feed ATR immediately so BORDER gate has real tolerance from tick 0
     _startup_atr = levels.get("atr_14")
     if _startup_atr and _startup_atr > 0:
@@ -977,13 +979,16 @@ def _run_event_driven(args) -> None:
                     processor.m30_bias       = new_bias
                     processor.m30_liq_top_gc = new_levels.get("m30_liq_top")
                     processor.m30_liq_bot_gc = new_levels.get("m30_liq_bot")
-                    # Refactor A 2026-05-12: GC-only. Aliases = _gc directly.
+                    # Convert M30 GC levels to MT5 space immediately
                     with processor._lock:
-                        processor.m30_liq_top = processor.m30_liq_top_gc
-                        processor.m30_liq_bot = processor.m30_liq_bot_gc
+                        off = processor._gc_xauusd_offset
+                        m30t = new_levels.get("m30_liq_top")
+                        m30b = new_levels.get("m30_liq_bot")
+                        processor.m30_liq_top = round(m30t - off, 2) if m30t is not None else None
+                        processor.m30_liq_bot = round(m30b - off, 2) if m30b is not None else None
                     if new_bias != old_bias:
                         _log.info(
-                            "M30 bias changed: %s -> %s  (m30_liq_top_gc=%.2f  m30_liq_bot_gc=%.2f)",
+                            "M30 bias changed: %s -> %s  (m30_liq_top=%.2f  m30_liq_bot=%.2f)",
                             old_bias, new_bias,
                             new_levels.get("m30_liq_top", 0),
                             new_levels.get("m30_liq_bot", 0),
@@ -992,17 +997,18 @@ def _run_event_driven(args) -> None:
                     if not skip_liq:
                         processor.liq_top_gc = new_levels["liq_top"]
                         processor.liq_bot_gc = new_levels["liq_bot"]
-                    # Refactor A 2026-05-12: structural box + level aliases = _gc.
+                    # Also update MT5-space immediately using current offset --
+                    # _refresh_offset() only runs when MT5 is available; this
+                    # ensures proximity checks never use stale levels.
                     with processor._lock:
+                        off = processor._gc_xauusd_offset
                         if not skip_liq:
-                            processor.liq_top  = processor.liq_top_gc
-                            processor.liq_bot  = processor.liq_bot_gc
+                            processor.liq_top  = round(processor.liq_top_gc - off, 2)
+                            processor.liq_bot  = round(processor.liq_bot_gc - off, 2)
                         bh = new_levels.get("box_high")
                         bl = new_levels.get("box_low")
-                        processor.box_high_gc = bh
-                        processor.box_low_gc  = bl
-                        processor.box_high = bh
-                        processor.box_low  = bl
+                        processor.box_high = round(bh - off, 2) if bh is not None else None
+                        processor.box_low  = round(bl - off, 2) if bl is not None else None
                     changed = (not skip_liq) and abs(new_levels["liq_top"] - old_top) > 0.5
                     _log.info(
                         "Levels refresh [%s box_id=%s age=%.1fh]: liq_top=%.2f  liq_bot=%.2f%s%s",

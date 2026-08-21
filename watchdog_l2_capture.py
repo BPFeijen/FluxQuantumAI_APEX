@@ -40,12 +40,20 @@ CAPTURE_DIR = Path(r"C:\FluxQuantumAI")
 LOG_DIR = CAPTURE_DIR / "logs"
 L2_DATA_DIR = Path(r"C:\data\level2\_gc_xcec")
 
-QUANTOWER_EXE = r"C:\Quantower\TradingPlatform\v1.145.17\Starter.exe"
+QUANTOWER_EXE = r"C:\Quantower\TradingPlatform\v1.146.14\Starter.exe"  # GO Barbara 2026-07-12 (incident): v1.145.17 removida pelo auto-update do Quantower -> restart_quantower falhava WinError 2 desde o upgrade; ATENCAO: novo auto-update repete o drift (fix estrutural = resolucao dinamica, lane do watchdog)
 QUANTOWER_PROC_NAME = "Starter"          # psutil process name (no .exe)
 
 HEARTBEAT_WARN_SECONDS = 600            # 10 minutes
 QUANTOWER_STARTUP_WAIT = 30             # seconds to wait after starting Quantower
 CHECK_INTERVAL = 60                     # seconds between watchdog loops
+
+# Bcap #2b: durable gap-marker (mesmo arquivo/formato do marcador da API).
+GAP_MARKER_FILE = L2_DATA_DIR.parent / "capture_gaps.csv"
+# Bcap #1 (DEFERIDO): auto-restart por feed-morto DESLIGADO até ML-DS assinar o threshold
+# (distribuição de cadência inter-dado em RTH). Inerte enquanto False.
+FEED_AWARE_RESTART_ENABLED = False
+FEED_STALE_RESTART_SECONDS = 180        # placeholder — CALIBRATION-NEEDED (ML-DS)
+FEED_STALE_RESTART_CHECKS = 2
 
 # ---------------------------------------------------------------------------
 # Logging setup
@@ -164,6 +172,37 @@ def _start_detached(args: list[str], cwd: str | None = None, log_name: str = "se
 
 
 # ---------------------------------------------------------------------------
+# Bcap #2b / #1 helpers
+# ---------------------------------------------------------------------------
+
+def _write_gap_marker(reason: str, gap_start_ts: float | None = None) -> None:
+    """Bcap #2b: append durável (flush+fsync) de um marcador de gap no arquivo compartilhado
+    com a API. Não depende da API (sobrevive a um kill). Best-effort — falha não para o watchdog."""
+    import csv
+    try:
+        now = datetime.now()
+        GAP_MARKER_FILE.parent.mkdir(parents=True, exist_ok=True)
+        write_header = not GAP_MARKER_FILE.exists()
+        gs = datetime.fromtimestamp(gap_start_ts).isoformat() if gap_start_ts else ""
+        with open(GAP_MARKER_FILE, "a", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            if write_header:
+                w.writerow(["recv_timestamp", "source", "reason", "gap_start", "gap_end", "detail"])
+            w.writerow([now.isoformat(), "watchdog", reason, gs, now.isoformat(), ""])
+            f.flush()
+            os.fsync(f.fileno())
+    except Exception as exc:
+        log.error("gap-marker falhou (não-fatal): %s", exc)
+
+
+def _is_trading_session(now: datetime) -> bool:
+    """Bcap #1 (INERTE enquanto FEED_AWARE_RESTART_ENABLED=False): aproximação conservadora da
+    sessão GC ativa. Refinar com calendário CME ANTES de habilitar #1. Default-True na borda
+    (nunca suprime um restart legítimo quando ligado)."""
+    return now.weekday() != 5   # exclui sábado; placeholder até o threshold ML-DS
+
+
+# ---------------------------------------------------------------------------
 # Restart helpers
 # ---------------------------------------------------------------------------
 
@@ -178,7 +217,7 @@ def restart_l2_api() -> None:
     log.warning("L2 capture (quantower_level2_api) DOWN — restarting")
     _start_detached(
         [PYTHON, "-m", "uvicorn", "quantower_level2_api:app",
-         "--host", "0.0.0.0", "--port", "8000",
+         "--host", "127.0.0.1", "--port", "8000",   # Bcap #3: same-host bridge → no network exposure (era 0.0.0.0)
          "--log-level", "info"],
         cwd=str(CAPTURE_DIR),
         log_name="quantower_level2_api",   # → logs/quantower_level2_api_stdout.log
@@ -232,12 +271,18 @@ def run() -> None:
 
             # --- Quantower ---
             if not qt_ok:
+                _gap_age = check_heartbeat()                       # Bcap #2b: outage window start
                 restart_quantower()
+                _write_gap_marker("quantower_restart",
+                                  (time.time() - _gap_age) if _gap_age != float("inf") else None)
                 qt_ok = _is_quantower_running()  # re-check after restart
 
             # --- L2 capture ---
             if not l2_ok:
+                _gap_age = check_heartbeat()                       # Bcap #2b
                 restart_l2_api()
+                _write_gap_marker("l2_api_restart",
+                                  (time.time() - _gap_age) if _gap_age != float("inf") else None)
 
             # --- Iceberg receiver ---
             if not ice_ok:
@@ -250,6 +295,19 @@ def run() -> None:
                     "WARNING: No new L2 data in %.0f minutes — capture may be stalled",
                     data_age / 60,
                 )
+
+            # --- Bcap #1 feed-aware auto-restart (DEFERIDO — OFF até ML-DS assinar o threshold) ---
+            if FEED_AWARE_RESTART_ENABLED:
+                feed_dead = _is_trading_session(datetime.now()) and data_age > FEED_STALE_RESTART_SECONDS
+                run._feed_stale_count = (getattr(run, "_feed_stale_count", 0) + 1) if feed_dead else 0
+                if run._feed_stale_count >= FEED_STALE_RESTART_CHECKS:
+                    log.error("FEED STALE %.0fs em sessão apesar da porta viva — restart "
+                              "(porta-que-não-é-feed)", data_age)
+                    _kill_hung_service("quantower_level2_api")
+                    restart_quantower(); restart_l2_api()
+                    _write_gap_marker("feed_stale_restart",
+                                      (time.time() - data_age) if data_age != float("inf") else None)
+                    run._feed_stale_count = 0
 
             # --- Status line ---
             age_str = f"{data_age:.0f}s ago" if data_age < float("inf") else "unknown"

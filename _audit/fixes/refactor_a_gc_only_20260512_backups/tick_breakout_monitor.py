@@ -152,9 +152,8 @@ class TickBreakoutMonitor:
 
     def _inject_levels(self, liq_top_gc: float, liq_bot_gc: float, reason: str) -> None:
         """
-        Update EventProcessor liq_top_gc / liq_bot_gc and back-compat aliases.
-        Refactor A 2026-05-12: aliases (liq_top / liq_bot) equal _gc directly
-        (no offset). Thread-safe: acquires processor._lock.
+        Update EventProcessor liq_top_gc / liq_bot_gc and MT5-space equivalents.
+        Thread-safe: acquires processor._lock.
         """
         proc = self._proc
         fmv_gc = round((liq_top_gc + liq_bot_gc) / 2.0, 2)
@@ -162,18 +161,20 @@ class TickBreakoutMonitor:
         with proc._lock:
             proc.liq_top_gc = liq_top_gc
             proc.liq_bot_gc = liq_bot_gc
-            proc.liq_top    = liq_top_gc
-            proc.liq_bot    = liq_bot_gc
+            proc.liq_top    = round(liq_top_gc - proc._gc_xauusd_offset, 2)
+            proc.liq_bot    = round(liq_bot_gc - proc._gc_xauusd_offset, 2)
             proc._macro_ctx_refresh_needed = True
 
         ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
         log.info(
-            "TICK_BREAKOUT [%s]: liq_top_gc=%.2f  liq_bot_gc=%.2f  fmv_gc=%.2f",
-            reason, liq_top_gc, liq_bot_gc, fmv_gc,
+            "TICK_BREAKOUT [%s]: liq_top_gc=%.2f  liq_bot_gc=%.2f  fmv_gc=%.2f"
+            "  MT5: liq_top=%.2f  liq_bot=%.2f",
+            reason, liq_top_gc, liq_bot_gc, fmv_gc, proc.liq_top, proc.liq_bot,
         )
         print(
             f"[{ts}] TICK_BREAKOUT [{reason}]:"
             f"  GC liq_top={liq_top_gc:.2f}  liq_bot={liq_bot_gc:.2f}"
+            f"  MT5 liq_top={proc.liq_top:.2f}  liq_bot={proc.liq_bot:.2f}"
         )
         try:
             if hasattr(proc, "request_macro_context_refresh"):

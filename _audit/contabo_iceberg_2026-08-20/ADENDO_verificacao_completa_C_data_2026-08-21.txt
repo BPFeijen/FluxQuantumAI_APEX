@@ -1,0 +1,75 @@
+ADENDO — Verificacao completa de C:\data vs Hetzner Storage Box
+Segue-se ao RELATORIO_FINAL_iceberg_contabo_2026-08-20.txt (mesma sessao, continuacao).
+Pedido de Barbara: "Poderia verificar se TODO o conteudo da pasta C:\data se encontra no
+storagebox da hetzner?"
+Metodo: rclone check --one-way, C:\data -> hetzner_sb:data/ (comparacao por checksum,
+read-only, nenhuma transferencia nesta fase). Excluidos da comparacao: "storagebox pass.txt"
+(ver achado 1) e DATA_MANIFEST.md (verificado manualmente a parte).
+
+================================================================================
+ESTRUTURA DE C:\data (topo)
+================================================================================
+calibration, features, grenadier, iceberg, labels, level2, "OHLCV History",
+processed, substrate_c1, _audit  (pastas)
+DATA_MANIFEST.md, "storagebox pass.txt"  (ficheiros soltos na raiz)
+
+Buckets cobertos pelo script sancionado (C:\TradeATS\scripts\daily_rclone_backup.ps1,
+Scheduled Task "FluxDataDailyBackup", diaria 02:30): processed, iceberg, level2, features,
+labels, grenadier, calibration — ou seja, "OHLCV History" e "substrate_c1" e "_audit" NAO
+fazem parte deste loop automatico. Ainda assim, todos os 3 ja existiam no remoto (por
+upload manual/historico nao documentado no script atual).
+
+================================================================================
+RESULTADO DO CHECK COMPLETO (rclone check --one-way, checksum)
+================================================================================
+Total verificado: 7.437 ficheiros locais (exclui os 2 ficheiros de raiz acima)
+Correspondencias: 7.310
+Diferencas/faltas: 127
+  - 111 em "iceberg/" -> NAO sao lacuna real. Sao exatamente os 111 ficheiros que
+    apareceram de forma inexplicada em C:\data\iceberg durante a sessao anterior desta
+    mesma auditoria (ver RELATORIO_FINAL, SS2.3) — pertencem ao formato/bucket
+    iceberg_tradeats, ja confirmados enviados e verificados la (SS3.3-3.4 do relatorio
+    anterior). O bucket "iceberg" (legacy) remoto continua 100% coberto para os
+    ficheiros que genuinamente lhe pertencem (formato "iceberg__*", ate 2026-07-11).
+  - 16 em "OHLCV History/EURUSD/" -> LACUNA REAL. Subpasta inteira nunca tinha sido
+    enviada. Ficheiros (M1, EURUSD, 2025 + jan-jul 2026), ~31 MiB total:
+      DAT_MT_EURUSD_M1_2025.csv / .txt
+      DAT_MT_EURUSD_M1_202601 .. 202607 .csv / .txt (7 meses x 2 formatos)
+    Os 3 CSVs GC/dxFeed soltos na raiz de "OHLCV History" ja estavam corretos no remoto.
+  - calibration, features, grenadier, labels, level2 (114,14 GiB / 4854 ficheiros),
+    processed, substrate_c1, _audit: 0 diferencas — 100% cobertos.
+
+Acao tomada (com GO explicito de Barbara em chat, 2026-08-21):
+  rclone copy --update --checksum, apenas os 16 ficheiros faltantes,
+  "C:\data\OHLCV History" -> "hetzner_sb:data/OHLCV History/" (destino ja existente,
+  copy-only, nunca move). Dry-run previo confirmou 16/16, 31.021 MiB, nada extra.
+  Execucao real: 16/16 "Copied (new)", 3.4s, exit code 0.
+  Verificacao pos-upload (rclone check --checksum): "16 matching files, 0 differences found".
+  Log completo: upload_ohlcv_run.log
+
+================================================================================
+ACHADO CRITICO (ja levantado em chat, aqui documentado formalmente)
+================================================================================
+1. C:\data\storagebox pass.txt (credenciais de acesso a propria Storage Box, 275 bytes,
+   mtime 2026-05-10 10:32:29) esta presente NO REMOTO em hetzner_sb:data/storagebox pass.txt
+   — mesmo tamanho, mesmo mtime, copia exata confirmada por metadados (conteudo NAO lido
+   por esta auditoria). Isto contradiz diretamente a regra ja registada: "Credenciais...
+   devem NUNCA ser sincronizadas. Excluir sempre explicitamente."
+   Decisao de Barbara (2026-08-21, em chat): NAO remover agora — ela trata disso
+   separadamente (ex.: rodar a password e so depois remover a copia exposta). Nenhuma
+   acao foi tomada sobre este ficheiro por esta auditoria, nem local nem remoto.
+   DATA_MANIFEST.md tambem esta no remoto e bate certo com o local (5469 bytes, mesmo
+   mtime) — sem problema.
+
+================================================================================
+CONCLUSAO
+================================================================================
+Com o upload dos 16 ficheiros OHLCV acima, TODO o conteudo de C:\data com significado de
+dados (excluindo o ficheiro de credenciais, que e um caso a parte) esta agora confirmado
+por checksum como presente no Hetzner Storage Box. Nao ha lacunas de dados conhecidas
+remanescentes antes do desligamento do servidor Contabo.
+
+Ficheiros de trabalho adicionais desta verificacao (em
+C:\FluxQuantumAI\_audit\contabo_iceberg_2026-08-20\):
+  full_data_check.log, missing_ohlcv.txt, upload_ohlcv_run.log,
+  ADENDO_verificacao_completa_C_data_2026-08-21.txt (este ficheiro)

@@ -281,13 +281,15 @@ OFFSET_REFRESH_S  = 300.0  # GC/XAUUSD offset refresh interval (5 min)
 log = logging.getLogger("apex.event")
 
 # ---------------------------------------------------------------------------
-# Refactor A 2026-05-12: GC-only architecture
+# MT5
 # ---------------------------------------------------------------------------
-# The MT5 XAUUSD probe (_mt5_price) and offset calibration (_compute_offset)
-# were removed. DXFeed/Quantower GC futures is now the single canonical price
-# space. Legacy MetaTrader5 import is preserved as a module reference only
-# (for tools that still import event_processor and expect _mt5 to exist), but
-# initialization is skipped entirely when BROKER=ctrader.
+# 2026-05-11: skip MetaTrader5 module-level init when BROKER=ctrader. The lib
+# triggers a Fortran-backed runtime that aborts the entire Python process via
+# 'forrtl: error (200): program aborting due to window-CLOSE event' when the
+# MT5 Terminal GUI it tries to attach to is not running (closed since the
+# broker switch). The MT5 price probe (_mt5_price) is used only for the
+# GC/XAUUSD offset calibration; under cTrader the offset is fixed at 31.0pts
+# (see _gc_xauusd_offset init), so the probe is unnecessary.
 _mt5 = None
 if os.environ.get("BROKER", "mt5").lower() != "ctrader":
     try:
@@ -297,10 +299,44 @@ if os.environ.get("BROKER", "mt5").lower() != "ctrader":
     except Exception:
         pass
 
+_mt5_last_fail: float = 0.0
+_MT5_RECONNECT_INTERVAL = 60.0   # retry MT5 init at most once per minute
+
+
+def _mt5_price() -> Optional[float]:
+    global _mt5, _mt5_last_fail
+    import time as _time
+
+    if _mt5 is None:
+        # Attempt reconnect at most once per _MT5_RECONNECT_INTERVAL seconds
+        now = _time.monotonic()
+        if now - _mt5_last_fail >= _MT5_RECONNECT_INTERVAL:
+            _mt5_last_fail = now
+            try:
+                import MetaTrader5 as _m
+                if _m.initialize():
+                    _mt5 = _m
+                    log.info("MT5 reconnected successfully")
+            except Exception as _e:
+                log.warning("MT5 reconnect failed: %s", _e)
+        if _mt5 is None:
+            return None
+
+    try:
+        tick = _mt5.symbol_info_tick(SYMBOL)
+        if tick:
+            return round((tick.ask + tick.bid) / 2.0, 2)
+        # Tick returned None -- MT5 session may have dropped; force reconnect next cycle
+        _mt5 = None
+        _mt5_last_fail = 0.0   # allow immediate retry next call
+    except Exception:
+        _mt5 = None
+        _mt5_last_fail = 0.0
+    return None
+
 
 def _compute_offset(gc_mid: float, xau_mid: float) -> float:
-    """Legacy: offset = GC_mid - XAUUSD_mid. Kept for back-compat with any
-    forensic tool that imports it. Live code no longer calls this (Refactor A)."""
+    """offset = GC_mid - XAUUSD_mid  (futures carry premium, ~31 pts)."""
     return round(gc_mid - xau_mid, 3)
 
 
@@ -628,15 +664,7 @@ class EventProcessor:
 
         # GC/XAUUSD offset: GC_mid - XAUUSD_mid  (~31 pts, refreshed every 5 min via MT5 calibration)
         # Default 31.0 so monitoring works immediately even if MT5 never responds.
-        # Refactor A 2026-05-12 (GC-only architecture):
-        # offset is now permanently 0. MT5/XAUUSD was a legacy execution layer
-        # (RoboForex/Hantec) and is no longer the source of truth. DXFeed/Quantower
-        # GC futures is the canonical price space. self.liq_top / self.box_high /
-        # self.price etc now equal their _gc counterparts directly. The name
-        # `_gc_xauusd_offset` is preserved as 0.0 for back-compat with any field
-        # still reading it; downstream math sees no change because the offset
-        # always cancels in proximity comparisons.
-        self._gc_xauusd_offset: float = 0.0
+        self._gc_xauusd_offset: float = 31.0
         self._offset_ts: float        = 0.0   # monotonic ts of last offset sample
 
         # Metrics cache -- updated by background thread, read by fast loop
@@ -846,8 +874,12 @@ class EventProcessor:
             "pid": os.getpid(),
             "running": self._running,
             "gc_price": _safe_round(gc_mid),
+            "mt5_price": _safe_round(gc_mid - offset) if gc_mid > 0 else 0.0,
+            "gc_mt5_offset": _safe_round(offset),
             "liq_top_gc": _safe_round(getattr(self, "liq_top_gc", None)),
             "liq_bot_gc": _safe_round(getattr(self, "liq_bot_gc", None)),
+            "liq_top_mt5": _safe_round(getattr(self, "liq_top", None)),
+            "liq_bot_mt5": _safe_round(getattr(self, "liq_bot", None)),
             "m30_bias": getattr(self, "m30_bias", "unknown"),
             "m30_bias_confirmed": getattr(self, "m30_bias_confirmed", False),
             "provisional_m30_bias": getattr(self, "provisional_m30_bias", "unknown"),
@@ -986,16 +1018,20 @@ class EventProcessor:
 
         d = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "price_mt5": round(price, 2),
             "price_gc": round(gc_mid, 2),
+            "gc_mt5_offset": round(offset, 2),
             "context": {
                 "phase": self._get_current_phase(),
                 "daily_trend": self.daily_trend,
                 "m30_bias": self.m30_bias,
                 "m30_bias_confirmed": self.m30_bias_confirmed,
                 "provisional_m30_bias": self.provisional_m30_bias,
-                "m30_box_gc": [round(self.box_low_gc, 2), round(self.box_high_gc, 2)] if self.box_high_gc else None,
-                "m30_fmv_gc": None,
+                "m30_box_mt5": [round(self.box_low, 2), round(self.box_high, 2)] if self.box_high else None,
+                "m30_fmv_mt5": None,
                 "m30_atr14": round(atr_m30, 2),
+                "liq_top_mt5": round(self.liq_top, 2),
+                "liq_bot_mt5": round(self.liq_bot, 2),
                 "liq_top_gc": round(self.liq_top_gc, 2),
                 "liq_bot_gc": round(self.liq_bot_gc, 2),
                 "session": session,
@@ -1004,7 +1040,7 @@ class EventProcessor:
             "trigger": {
                 "type": trigger,
                 "level_type": "liq_top" if direction == "SHORT" else "liq_bot",
-                "level_price_gc": round(self.liq_top_gc if direction == "SHORT" else self.liq_bot_gc, 2),
+                "level_price_mt5": round(self.liq_top if direction == "SHORT" else self.liq_bot, 2),
                 "proximity_pts": round(abs(price - (self.liq_top if direction == "SHORT" else self.liq_bot)), 1),
                 "near_level_source": self._near_level_source or "unknown",
             },
@@ -1058,16 +1094,20 @@ class EventProcessor:
         atr_m30 = self._metrics.get("atr_m30_parquet", self._metrics.get("atr", 0))
         payload = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "price_mt5": round(price, 2),
             "price_gc": round(gc_mid, 2),
+            "gc_mt5_offset": round(offset, 2),
             "context": {
                 "phase": self._get_current_phase(),
                 "daily_trend": self.daily_trend,
                 "m30_bias": self.m30_bias,
                 "m30_bias_confirmed": self.m30_bias_confirmed,
                 "provisional_m30_bias": self.provisional_m30_bias,
-                "m30_box_gc": [round(self.box_low_gc, 2), round(self.box_high_gc, 2)] if self.box_high_gc else None,
-                "m30_fmv_gc": None,
+                "m30_box_mt5": [round(self.box_low, 2), round(self.box_high, 2)] if self.box_high else None,
+                "m30_fmv_mt5": None,
                 "m30_atr14": round(atr_m30, 2),
+                "liq_top_mt5": round(self.liq_top, 2),
+                "liq_bot_mt5": round(self.liq_bot, 2),
                 "liq_top_gc": round(self.liq_top_gc, 2),
                 "liq_bot_gc": round(self.liq_bot_gc, 2),
                 "delta_4h": round(self._metrics.get("delta_4h", 0), 0),
@@ -1077,7 +1117,7 @@ class EventProcessor:
             "trigger": {
                 "type": trigger,
                 "level_type": "liq_top" if direction == "SHORT" else "liq_bot",
-                "level_price_gc": round(self.liq_top_gc if direction == "SHORT" else self.liq_bot_gc, 2),
+                "level_price_mt5": round(self.liq_top if direction == "SHORT" else self.liq_bot, 2),
                 "proximity_pts": round(abs(price - (self.liq_top if direction == "SHORT" else self.liq_bot)), 1),
                 "near_level_source": self._near_level_source or "unknown",
             },
@@ -1135,8 +1175,7 @@ class EventProcessor:
         attempted_any = False
         _lot_total = sum(explicit_lots) if explicit_lots else self.lot_size
         _ctx = strategy_context or {}
-        # Refactor A 2026-05-12: GC-only. price is now gc_mid directly.
-        price = float(self._metrics.get("gc_mid", 0.0))
+        price = float(self._metrics.get("gc_mid", 0.0) - self._gc_xauusd_offset)
         brokers: list[dict] = []
 
         def _state_from_result(result: dict | None, connected: bool) -> tuple[str, str]:
@@ -1438,10 +1477,8 @@ class EventProcessor:
 
     def _metrics_loop(self):
         """Background thread: refresh delta_4h, ATR, gc_mid every 10s or on file change.
-
-        Refactor A 2026-05-12: MT5 offset calibration removed. System now operates
-        in pure GC space (DXFeed/Quantower) -- the MT5 XAUUSD probe was a legacy
-        artifact of when RoboForex was the execution layer.
+        Also refreshes GC/XAUUSD offset via MT5 calibration every OFFSET_REFRESH_S seconds.
+        MT5 is NEVER used in the fast tick loop -- only here for offset calibration.
         """
         while self._running:
             triggered = self._micro_dirty.wait(timeout=METRICS_REFRESH_S)
@@ -1449,6 +1486,12 @@ class EventProcessor:
             if not self._running:
                 break
             self._refresh_metrics()
+            # Offset calibration: query MT5 at most every OFFSET_REFRESH_S seconds.
+            # This is the ONLY place MT5 is queried for price data.
+            if (time.monotonic() - self._offset_ts) >= OFFSET_REFRESH_S:
+                xau_now = _mt5_price()
+                if xau_now:
+                    self._refresh_offset(xau_now)
 
     def _refresh_metrics(self):
         path = self._micro_path()
@@ -1706,9 +1749,9 @@ class EventProcessor:
                 if pd.notna(row.get("m30_liq_bot")):
                     self.m30_liq_bot_gc = float(row.get("m30_liq_bot"))
                 if self.m30_liq_top_gc is not None:
-                    self.m30_liq_top = self.m30_liq_top_gc
+                    self.m30_liq_top = round(self.m30_liq_top_gc - self._gc_xauusd_offset, 2)
                 if self.m30_liq_bot_gc is not None:
-                    self.m30_liq_bot = self.m30_liq_bot_gc
+                    self.m30_liq_bot = round(self.m30_liq_bot_gc - self._gc_xauusd_offset, 2)
                 self._macro_ctx_last_refresh = time.monotonic()
                 self._macro_ctx_refresh_needed = False
 
@@ -1824,24 +1867,39 @@ class EventProcessor:
             self._macro_ctx_refresh_needed = True
         self.refresh_macro_context(reason=reason)
 
-    def _refresh_offset(self, xau_price: float | None = None) -> None:
-        """GC-only mode (Refactor A 2026-05-12). All level fields are now
-        identical to their _gc counterparts (offset permanently 0). This
-        method is preserved for back-compat but only re-syncs the legacy
-        aliases (self.liq_top = self.liq_top_gc etc) so any caller that
-        races a level update still gets a coherent value. The xau_price
-        argument is ignored.
+    def _refresh_offset(self, xau_price: float) -> None:
         """
+        Refresh GC/XAUUSD offset using latest MT5 tick and latest GC micro price.
+        Uses EWM(span=3) to smooth out tick-level noise.
+        Called every OFFSET_REFRESH_S seconds from the tick loop.
+        """
+        gc_mid = self._metrics.get("gc_mid", 0.0)
+        if gc_mid <= 0 or xau_price <= 0:
+            return
+        raw_offset = _compute_offset(gc_mid, xau_price)
         with self._lock:
-            self.liq_top  = self.liq_top_gc
-            self.liq_bot  = self.liq_bot_gc
-            self.box_high = self.box_high_gc if self.box_high_gc is not None else None
-            self.box_low  = self.box_low_gc  if self.box_low_gc  is not None else None
+            if self._gc_xauusd_offset == 0.0:
+                # First sample: use raw value directly
+                self._gc_xauusd_offset = raw_offset
+            else:
+                # EWM update: alpha = 2/(span+1) with span=3 -> alpha=0.5
+                alpha = 0.5
+                self._gc_xauusd_offset = round(
+                    alpha * raw_offset + (1 - alpha) * self._gc_xauusd_offset, 3
+                )
+            # Update MT5-equivalent levels -- M5 execution
+            self.liq_top  = round(self.liq_top_gc - self._gc_xauusd_offset, 2)
+            self.liq_bot  = round(self.liq_bot_gc - self._gc_xauusd_offset, 2)
+            self.box_high = round(self.box_high_gc - self._gc_xauusd_offset, 2) if self.box_high_gc is not None else None
+            self.box_low  = round(self.box_low_gc  - self._gc_xauusd_offset, 2) if self.box_low_gc  is not None else None
+            # Update MT5-equivalent levels -- M30 macro (border alignment)
             if self.m30_liq_top_gc is not None:
-                self.m30_liq_top = self.m30_liq_top_gc
+                self.m30_liq_top = round(self.m30_liq_top_gc - self._gc_xauusd_offset, 2)
             if self.m30_liq_bot_gc is not None:
-                self.m30_liq_bot = self.m30_liq_bot_gc
+                self.m30_liq_bot = round(self.m30_liq_bot_gc - self._gc_xauusd_offset, 2)
             self._offset_ts = time.monotonic()
+        log.debug("offset refreshed: GC-XAU=%.3f  liq_top_mt5=%.2f  liq_bot_mt5=%.2f",
+                  self._gc_xauusd_offset, self.liq_top, self.liq_bot)
 
     # ------------------------------------------------------------------
     # V3 RL helpers
@@ -5029,11 +5087,9 @@ class EventProcessor:
             if gc_price <= 0:
                 print(f"[{ts}] Quantower data unavailable | waiting for microstructure")
             else:
-                # Refactor A 2026-05-12: GC-only. `xau_price` retained as variable
-                # name for back-compat with downstream methods but now holds GC value.
-                offset    = 0.0
-                xau_price = gc_price
-                self._speed_tracker.add_tick(xau_price)
+                offset    = self._gc_xauusd_offset
+                xau_price = round(gc_price - offset, 2)   # MT5 XAUUSD equivalent
+                self._speed_tracker.add_tick(xau_price)   # feed Price Speed tracker
                 self._metrics["xau_mid"] = xau_price
                 level_type, level_price = self._near_level(xau_price)
                 d4h = metrics.get("delta_4h", 0.0)
@@ -5041,10 +5097,16 @@ class EventProcessor:
                 if level_type:
                     direction, _strat_reason = self._resolve_direction(level_type)
                     if direction is None:
-                        print(f"[{ts}] GC={gc_price:.2f}"
-                              f" | {level_type}={level_price:.2f} <- [STRATEGY] SKIP ({_strat_reason})")
+                        # TRENDING mode: this level is a liquidation zone, skip
+                        gc_level = round(level_price + offset, 2)
+                        print(f"[{ts}] GC={gc_price:.2f} | XAUUSD={xau_price:.2f} | offset={offset:+.2f}"
+                              f" | {level_type}_mt5={level_price:.2f} <- [STRATEGY] SKIP ({_strat_reason})")
                         continue
 
+                    # Sprint A C1 entry_logic_fix_20260420: direction-aware post-validation.
+                    # Suppresses 03:14-class fires where legacy near_level matched a level on
+                    # the wrong side of price for the resolved direction. Overextension-reversal
+                    # signals are intentionally filtered too (Barbara C1 decision: no exception).
                     _pv_status, _pv_cand = self._near_level(xau_price, direction=direction)
                     if _pv_status != "PASS":
                         log.info(
@@ -5052,12 +5114,14 @@ class EventProcessor:
                             _pv_status, direction, level_type, level_price, xau_price,
                         )
                         self._metric_incr("near_level.post_validation.tick." + _pv_status.lower())
-                        print(f"[{ts}] GC={gc_price:.2f}"
-                              f" | {level_type}={level_price:.2f} <- [POST_VAL {_pv_status}] suppressed (dir={direction})")
+                        print(f"[{ts}] GC={gc_price:.2f} | XAUUSD={xau_price:.2f} | offset={offset:+.2f}"
+                              f" | {level_type}_mt5={level_price:.2f} <- [POST_VAL {_pv_status}] suppressed (dir={direction})")
                         continue
 
                     delta     = abs(xau_price - level_price)
 
+                    # DWELL_STALE REMOVED 2026-04-14: was suppressing valid signals
+                    # Gate cooldown per-direction is the only rate limiter now.
                     now_check = time.monotonic()
                     _dir_last = self._last_trigger_by_dir.get(direction, 0.0)
                     cooldown_remaining = GATE_COOLDOWN_S - (now_check - _dir_last)
@@ -5066,9 +5130,10 @@ class EventProcessor:
                     else:
                         label = "<- NEAR (cooldown %.0fs)" % cooldown_remaining
 
+                    # FASE 2a: source classification in tick output
                     _src = self._near_level_source or "?"
-                    print(f"[{ts}] GC={gc_price:.2f}"
-                          f" | NEAR {level_type}={level_price:.2f} (delta={delta:.2f})"
+                    print(f"[{ts}] GC={gc_price:.2f} | XAUUSD={xau_price:.2f} | offset={offset:+.2f}"
+                          f" | NEAR {level_type}_mt5={level_price:.2f} (delta={delta:.2f})"
                           f" [{_src}] {label}")
 
                     threading.Thread(
@@ -5078,6 +5143,11 @@ class EventProcessor:
                         daemon=True,
                     ).start()
                 else:
+                    # Price left all near-level bands (no dwell tracking)
+
+                    # ── PATCH 2A: Trend Continuation trigger ──────────
+                    # When price is OUTSIDE box in trend direction and no
+                    # liq level is nearby, evaluate CONTINUATION directly.
                     _p2a = self._patch2a_continuation_trigger(xau_price, gc_price, offset)
                     if _p2a:
                         _p2a_dir, _p2a_reason = _p2a
@@ -5085,17 +5155,18 @@ class EventProcessor:
                         _p2a_last = self._last_trigger_by_dir.get(_p2a_dir, 0.0)
                         cooldown_remaining = GATE_COOLDOWN_S - (now_check - _p2a_last)
                         if cooldown_remaining <= 0:
-                            print(f"[{ts}] GC={gc_price:.2f}"
+                            print(f"[{ts}] GC={gc_price:.2f} | XAUUSD={xau_price:.2f}"
                                   f" | PATCH2A_CONTINUATION {_p2a_dir} <- GATE TRIGGERED")
                             threading.Thread(
                                 target=self._trigger_gate,
                                 args=(xau_price, _p2a_dir, "PATCH2A", _p2a_reason),
                                 daemon=True,
                             ).start()
+                        # else: in cooldown, skip silently
                     else:
-                        print(f"[{ts}] GC={gc_price:.2f}"
-                              f" | liq_top_gc={self.liq_top_gc:.2f}"
-                              f"  liq_bot_gc={self.liq_bot_gc:.2f}"
+                        print(f"[{ts}] GC={gc_price:.2f} | XAUUSD={xau_price:.2f} | offset={offset:+.2f}"
+                              f" | liq_top_mt5={self.liq_top:.2f}(GC:{self.liq_top_gc:.2f})"
+                              f"  liq_bot_mt5={self.liq_bot:.2f}(GC:{self.liq_bot_gc:.2f})"
                               f" | d4h={d4h:+.0f} | monitoring")
 
             # Sleep remainder of 1-second cycle
@@ -5120,15 +5191,23 @@ class EventProcessor:
         print(f"  delta_4h={self._metrics['delta_4h']:+.0f}  ATR={self._metrics['atr']:.1f}pts"
               f"  NEAR band = {max(self._metrics['atr']*NEAR_ATR_FACTOR, NEAR_FLOOR_PTS):.1f}pts")
 
-        # Refactor A 2026-05-12: GC-only mode. No MT5 probe, no offset. Internal
-        # aliases self.liq_top/_bot/box_high/_low equal their _gc counterparts.
+        # Initial GC/XAUUSD offset -- try MT5 once for calibration, fall back to default 31 pts.
+        # Monitoring does NOT depend on this succeeding; offset is refined in background loop.
+        xau_now = _mt5_price()
+        if xau_now and self._metrics.get("gc_mid", 0) > 0:
+            self._refresh_offset(xau_now)
+            print(f"  GC/XAUUSD offset : {self._gc_xauusd_offset:+.3f} pts"
+                  f"  (GC={self._metrics['gc_mid']:.2f}  XAUUSD={xau_now:.2f})")
+        else:
+            print(f"  GC/XAUUSD offset : {self._gc_xauusd_offset:+.3f} pts (default -- MT5 offline, will auto-calibrate)")
+        # Convert GC structural levels to MT5 space using current offset
         with self._lock:
-            self.liq_top  = self.liq_top_gc
-            self.liq_bot  = self.liq_bot_gc
-            self.box_high = self.box_high_gc if self.box_high_gc is not None else None
-            self.box_low  = self.box_low_gc  if self.box_low_gc  is not None else None
-        print(f"  liq_top : GC {self.liq_top_gc:.2f}")
-        print(f"  liq_bot : GC {self.liq_bot_gc:.2f}")
+            self.liq_top  = round(self.liq_top_gc - self._gc_xauusd_offset, 2)
+            self.liq_bot  = round(self.liq_bot_gc - self._gc_xauusd_offset, 2)
+            self.box_high = round(self.box_high_gc - self._gc_xauusd_offset, 2) if self.box_high_gc is not None else None
+            self.box_low  = round(self.box_low_gc  - self._gc_xauusd_offset, 2) if self.box_low_gc  is not None else None
+        print(f"  liq_top : GC {self.liq_top_gc:.2f} -> MT5 {self.liq_top:.2f}")
+        print(f"  liq_bot : GC {self.liq_bot_gc:.2f} -> MT5 {self.liq_bot:.2f}")
 
         # Background metrics refresh thread
         threading.Thread(target=self._metrics_loop, name="metrics", daemon=True).start()
@@ -5168,9 +5247,11 @@ class EventProcessor:
         print(f"  max_positions: {thr['max_positions']}")
         print(f"  margin_min   : {thr['margin_level_min']}%")
         print(f"  next recal   : {thr.get('next_recalibration', '?')}")
-        print(f"  Symbol       : GC  (CME futures, DXFeed/Quantower price space; cTrader = GCM26 execution)")
-        print(f"  liq_top_gc   : {self.liq_top_gc:.2f}")
-        print(f"  liq_bot_gc   : {self.liq_bot_gc:.2f}")
+        print(f"  MT5 Symbol   : {SYMBOL}  (spot gold)")
+        print(f"  Micro Symbol : GC        (CME futures, Quantower/DXFeed)")
+        print(f"  GC offset    : {self._gc_xauusd_offset:+.3f} pts  (refreshed every 5min)")
+        print(f"  liq_top      : GC {self.liq_top_gc:.2f} -> MT5 {self.liq_top:.2f}")
+        print(f"  liq_bot      : GC {self.liq_bot_gc:.2f} -> MT5 {self.liq_bot:.2f}")
         print(f"  Mode         : {mode}")
         print(f"  Lot          : {self.lot_size:.2f}  SL={self.sl_pts:.0f}pts  TP1={self.tp1_pts:.0f}pts  TP2={self.tp2_pts:.0f}pts")
         print(f"  Cooldown     : {GATE_COOLDOWN_S:.0f}s between gate triggers")

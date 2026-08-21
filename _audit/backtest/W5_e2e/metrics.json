@@ -1,0 +1,82 @@
+{
+  "generated": "2026-05-09T12:48:47.047212+00:00",
+  "window": [
+    "2025-07-01 00:00:00+00:00",
+    "2026-04-07 00:00:00+00:00"
+  ],
+  "metrics": {
+    "n_trades": 30,
+    "n_wins": 12,
+    "n_losses": 18,
+    "n_flats": 0,
+    "win_rate": 0.4,
+    "gross_win_usd": 370.100000000004,
+    "gross_loss_usd": 947.2499999999968,
+    "profit_factor": 0.3907099498548485,
+    "pnl_usd": -577.1499999999928,
+    "initial_capital": 1000.0,
+    "final_capital": 422.8500000000072,
+    "return_pct": -57.714999999999286,
+    "max_drawdown_usd": 602.6142857142831,
+    "max_drawdown_pct": 58.76501932922318,
+    "avg_win_usd": 30.841666666667,
+    "avg_loss_usd": -52.62499999999982,
+    "avg_duration_min": 37.9,
+    "exit_reason_dist": {
+      "L2_DANGER_PRE_SHIELD": {
+        "n": 8,
+        "wins": 3,
+        "losses": 5,
+        "pnl": -111.99999999999591
+      },
+      "SL_HIT": {
+        "n": 12,
+        "wins": 0,
+        "losses": 12,
+        "pnl": -794.2499999999973
+      },
+      "GIVEBACK_PRE_SHIELD": {
+        "n": 8,
+        "wins": 8,
+        "losses": 0,
+        "pnl": 270.75000000000273
+      },
+      "T3_DEFENSE_PRE_SHIELD": {
+        "n": 1,
+        "wins": 0,
+        "losses": 1,
+        "pnl": -4.0000000000009095
+      },
+      "GIVEBACK_AFTER_SHIELD": {
+        "n": 1,
+        "wins": 1,
+        "losses": 0,
+        "pnl": 62.349999999998545
+      }
+    }
+  },
+  "blocks": {
+    "same_level_cooldown": 93,
+    "rr_below_min": 194,
+    "daily_range_short_lower": 103,
+    "daily_loss_limit": 131,
+    "min_score_go": 92,
+    "atr_extreme": 49
+  },
+  "config": {
+    "initial_capital_usd": 1000.0,
+    "lots": [
+      0.02,
+      0.02,
+      0.01
+    ],
+    "dollar_per_pt_total": 5.0,
+    "sl_buffer_atr_mult": 1.0,
+    "sl_buffer_min_pts": 8.0,
+    "trailing_pts_after_shield": 12.0,
+    "regime_flip_delta_thr": 200,
+    "l2_danger_dom_thr": 30.0,
+    "t3_defense_bar_delta_thr": 500,
+    "giveback_pct": 0.5
+  }
+}

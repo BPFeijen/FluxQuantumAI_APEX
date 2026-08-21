@@ -74,7 +74,7 @@ ANOMALY_STRESS_VS_DIRECTION = {
 class VirtualActivePosition:
     vap_id: str                      # decision_id of originating GO decision
     direction: str                    # "LONG" | "SHORT"
-    entry_price: float                # price_gc at GO emission (Refactor A 2026-05-12)
+    entry_price: float                # price_mt5 at GO emission
     entry_ts: str                     # ISO8601 from decision payload
     sl: float                         # from decision.sl
     tp1: float                        # from decision.tp1
@@ -195,7 +195,7 @@ def _build_vap_from_decision(decision: dict) -> Optional[VirtualActivePosition]:
     return VirtualActivePosition(
         vap_id=decision.get("decision_id") or str(uuid.uuid4())[:8],
         direction=direction,
-        entry_price=float(decision.get("price_gc") or decision.get("price_mt5") or 0.0),
+        entry_price=float(decision.get("price_mt5") or 0.0),
         entry_ts=entry_ts,
         sl=float(dec.get("sl") or 0.0),
         tp1=float(dec.get("tp1") or 0.0),

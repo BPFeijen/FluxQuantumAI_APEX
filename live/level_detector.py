@@ -574,27 +574,58 @@ def _bars_in_box(m30_df: pd.DataFrame, box_id) -> int:
 
 
 def _classify_box_row(row) -> str:
-    """Existing bull_ext/bear_ext classification (preserved 32343cf semantics)."""
+    """ATS Wyckoff with spring/upthrust REJECTION validation (FUNC_M30_Framework_20260401.md §5.3).
+
+    A liquidity extension by itself is NOT directional -- the doctrine
+    requires the probe to be REJECTED (price returns inside the box) before
+    it counts as accumulation/distribution. A probe that holds (close
+    stays beyond box) is the start of a markdown/markup, the OPPOSITE bias.
+
+    Classification table (close = last bar close of the box):
+      spring probe       (liq_bot < box_low) and close >= box_low  -> bullish (accumulation)
+      markdown   "       (liq_bot < box_low) and close <  box_low  -> bearish (probe held, breakdown)
+      upthrust probe     (liq_top > box_high) and close <= box_high -> bearish (distribution)
+      markup     "       (liq_top > box_high) and close >  box_high -> bullish (probe held, breakout)
+      both extensions present or neither                            -> unknown
+
+    History:
+      - 2026-05-12 v1: flipped 32343cf semantics that returned bullish on
+        upthrust and bearish on spring (BUG-SIGNAL-INVERTED inside the
+        classifier; 99% SHORT bias during +86pt rally).
+      - 2026-05-12 v2: added close-vs-box validation to distinguish a real
+        spring (rejected) from a markdown (probe held). Box 5294
+        (2026-05-12 04:30-05:30) was the trigger case: spring extension
+        present but every close < box_low; followed by -24pt gap-down at
+        06:00. v1 still misclassified that as bullish.
+    """
     box_high = row.get("m30_box_high", float("nan"))
     box_low  = row.get("m30_box_low",  float("nan"))
     liq_top  = row.get("m30_liq_top",  float("nan"))
     liq_bot  = row.get("m30_liq_bot",  float("nan"))
+    close    = row.get("close",        float("nan"))
 
-    bull_ext = (
-        not pd.isna(liq_top)
-        and not pd.isna(box_high)
-        and float(liq_top) > float(box_high)
-    )
-    bear_ext = (
+    if pd.isna(close):
+        return "unknown"
+
+    spring_ext = (
         not pd.isna(liq_bot)
         and not pd.isna(box_low)
         and float(liq_bot) < float(box_low)
     )
+    upthrust_ext = (
+        not pd.isna(liq_top)
+        and not pd.isna(box_high)
+        and float(liq_top) > float(box_high)
+    )
 
-    if bull_ext and not bear_ext:
-        return "bullish"
-    if bear_ext and not bull_ext:
-        return "bearish"
+    if spring_ext and not upthrust_ext:
+        if float(close) >= float(box_low):
+            return "bullish"   # spring rejected -> accumulation
+        return "bearish"       # spring failed -> markdown
+    if upthrust_ext and not spring_ext:
+        if float(close) <= float(box_high):
+            return "bearish"   # upthrust rejected -> distribution
+        return "bullish"       # upthrust failed -> markup
     return "unknown"
 
 

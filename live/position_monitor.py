@@ -43,10 +43,22 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from mt5_executor import MT5Executor, MAGIC, SYMBOL, LOT_SIZE, MIN_LOT, _split_lots
+import os as _os_pm
+# 2026-05-11: when BROKER=ctrader, skip MT5-only imports that trigger MetaTrader5
+# native lib init and abort the Python process via 'forrtl error (200) window-CLOSE'
+# when the MT5 Terminal is not running.
+_BROKER_PM = _os_pm.environ.get("BROKER", "mt5").lower()
+if _BROKER_PM == "ctrader":
+    from ctrader_executor import (
+        CTraderExecutor as MT5Executor,
+        MAGIC, SYMBOL, LOT_SIZE, MIN_LOT, _split_lots,
+    )
+    MT5HistoryWatcher = None  # type: ignore[assignment]
+else:
+    from mt5_executor import MT5Executor, MAGIC, SYMBOL, LOT_SIZE, MIN_LOT, _split_lots
+    from live.mt5_history_watcher import MT5HistoryWatcher
 from live.hedge_manager import HedgeManager
 from live.level_detector import derive_m30_bias
-from live.mt5_history_watcher import MT5HistoryWatcher
 
 # V3 RL -- lazy import so the module loads even without sb3-contrib installed
 try:
@@ -122,13 +134,18 @@ def _load_thresholds() -> dict:
 # ---------------------------------------------------------------------------
 # MT5 (read-only reference -- executor handles all MT5 writes)
 # ---------------------------------------------------------------------------
+# 2026-05-11: skip MetaTrader5 module-level init when BROKER=ctrader. The lib
+# calls into a Fortran runtime that aborts the entire Python process via
+# 'forrtl: error (200): program aborting due to window-CLOSE event' when the
+# MT5 Terminal GUI is not running (it is closed since the broker switch).
 _mt5 = None
-try:
-    import MetaTrader5 as _m
-    if _m.initialize():
-        _mt5 = _m
-except Exception:
-    pass
+if _BROKER_PM != "ctrader":
+    try:
+        import MetaTrader5 as _m
+        if _m.initialize():
+            _mt5 = _m
+    except Exception:
+        pass
 
 
 def _mt5_price() -> Optional[float]:
@@ -391,13 +408,20 @@ class PositionMonitor:
         # === Fase 3 Scope B.1 — MT5 history watcher ===
         # Detects TP/SL/manual/system closes via MT5 deal history.
         # Called on-demand when position count drops (efficient — no polling).
-        try:
-            self._history_watcher = MT5HistoryWatcher(self.executor, MAGIC)
-            self._last_position_count = 0
-        except Exception as _hw_err:
-            log.warning("MT5HistoryWatcher init failed: %s (continuing without)", _hw_err)
+        # 2026-05-11: skip when BROKER=ctrader (MT5HistoryWatcher is None at
+        # import time in that case — see top of file).
+        if MT5HistoryWatcher is None:
+            log.info("MT5HistoryWatcher skipped — BROKER=ctrader, using broker-native reconciliation")
             self._history_watcher = None
             self._last_position_count = 0
+        else:
+            try:
+                self._history_watcher = MT5HistoryWatcher(self.executor, MAGIC)
+                self._last_position_count = 0
+            except Exception as _hw_err:
+                log.warning("MT5HistoryWatcher init failed: %s (continuing without)", _hw_err)
+                self._history_watcher = None
+                self._last_position_count = 0
 
         self.dry_run        = dry_run
         self.v3_agent       = v3_agent   # Optional[V3Agent]
